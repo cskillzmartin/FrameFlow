@@ -40,6 +40,12 @@ Each step shows progress in the application's interface, and the final output in
 - Story-ordered edit
 - Final edited video
 
+After installing all dependancies open the folder in VS Code
+run commands:
+dotnet restore 
+dotnet build
+dotnet run
+
 ## Dependencies
 
 ### Required Software
