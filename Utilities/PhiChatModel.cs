@@ -33,7 +33,6 @@ namespace FrameFlow.Utilities
         {
             try
             {
-                // Initialize model components
                 _model = new Model(modelPath);
                 _tokenizer = new Tokenizer(_model);
                 _tokenizerStream = _tokenizer.CreateStream();
@@ -45,16 +44,7 @@ namespace FrameFlow.Utilities
                 throw new InvalidOperationException($"Failed to load model from {modelPath}: {ex.Message}", ex);
             }
 
-            // Set configuration
-            Temperature = temperature;
-            TopP = topP;
-            RepetitionPenalty = repetitionPenalty;
-            MaxLength = maxLength;
-            MinLength = minLength;
-            RandomSeed = randomSeed??System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, int.MaxValue);
-            SystemPrompt = systemPrompt ?? Prompts.System.DefaultAssistant;
-
-            UpdateGeneratorParams();
+            InitializeParameters(temperature, topP, repetitionPenalty, maxLength, minLength, randomSeed, systemPrompt);
         }
 
         private static string FindCpuModelPath(string basePath)
@@ -95,28 +85,16 @@ namespace FrameFlow.Utilities
 
         public string Chat(string userInput, bool addToHistory = true)
         {
-            if (addToHistory)
-                _chatHistory.Add(("user", userInput));
-
-            var prompt = BuildChatPrompt();
-            var sequences = _tokenizer.Encode(prompt);
-
-            using var generator = new Generator(_model, _genParams);
-            generator.AppendTokenSequences(sequences);
-
-            var response = "";
-            while (!generator.IsDone())
-            {
-                generator.GenerateNextToken();
-                var token = _tokenizerStream.Decode(generator.GetSequence(0)[^1]);
-                response += token;
-            }
-
-            response = response.Trim();
+            var prompt = BuildChatPrompt(userInput);
+            using var generator = CreateGenerator(prompt);
+            var response = ProcessGeneratorResponse(generator, addToHistory);
             
             if (addToHistory)
+            {
+                _chatHistory.Add(("user", userInput));
                 _chatHistory.Add(("assistant", response));
-
+            }
+            
             return response;
         }
 
@@ -125,7 +103,7 @@ namespace FrameFlow.Utilities
             if (addToHistory)
                 _chatHistory.Add(("user", userInput));
 
-            var prompt = BuildChatPrompt();
+            var prompt = BuildChatPrompt(userInput);
             var sequences = _tokenizer.Encode(prompt);
 
             using var generator = new Generator(_model, _genParams);
@@ -148,7 +126,7 @@ namespace FrameFlow.Utilities
             return response;
         }
 
-        private string BuildChatPrompt()
+        private string BuildChatPrompt(string currentInput)
         {
             var prompt = $"<|system|>{SystemPrompt}<|end|>";
             
@@ -157,7 +135,7 @@ namespace FrameFlow.Utilities
                 prompt += $"<|{role}|>{content}<|end|>";
             }
             
-            prompt += "<|assistant|>";
+            prompt += $"<|user|>{currentInput}<|end|><|assistant|>";
             return prompt;
         }
 
@@ -212,13 +190,7 @@ namespace FrameFlow.Utilities
 
             response = response.Trim();
             
-            // Try to extract a number from the response
-            if (float.TryParse(new string(response.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float score))
-            {
-                // Clamp between 0 and 100
-                return Math.Clamp(score, 0, 100);
-            }
-            return 0f; // If parsing fails, treat as not relevant
+            return ParseScoreResponse(response);
         }
 
         public void Dispose()
@@ -227,6 +199,63 @@ namespace FrameFlow.Utilities
             _tokenizer?.Dispose();
             _genParams?.Dispose();
             _model?.Dispose();
+        }
+
+        private void InitializeParameters(
+            float temperature,
+            float topP,
+            float repetitionPenalty,
+            int maxLength,
+            int minLength,
+            int? randomSeed,
+            string? systemPrompt)
+        {
+            Temperature = temperature;
+            TopP = topP;
+            RepetitionPenalty = repetitionPenalty;
+            MaxLength = maxLength;
+            MinLength = minLength;
+            RandomSeed = randomSeed ?? RandomNumberGenerator.GetInt32(0, int.MaxValue);
+            SystemPrompt = systemPrompt ?? Prompts.System.DefaultAssistant;
+            UpdateGeneratorParams();
+        }
+
+        private Generator CreateGenerator(string prompt)
+        {
+            var sequences = _tokenizer.Encode(prompt);
+            var generator = new Generator(_model, _genParams);
+            generator.AppendTokenSequences(sequences);
+            return generator;
+        }
+
+        private string ProcessGeneratorResponse(Generator generator, bool addToHistory = true)
+        {
+            var response = "";
+            while (!generator.IsDone())
+            {
+                generator.GenerateNextToken();
+                var token = _tokenizerStream.Decode(generator.GetSequence(0)[^1]);
+                response += token;
+            }
+
+            response = response.Trim();
+            if (addToHistory)
+                _chatHistory.Add(("assistant", response));
+            
+            return response;
+        }
+
+        private float ParseScoreResponse(string response)
+        {
+            if (float.TryParse(
+                new string(response.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray()).Replace(',', '.'), 
+                System.Globalization.NumberStyles.Float, 
+                System.Globalization.CultureInfo.InvariantCulture, 
+                out float score))
+            {
+                return Math.Clamp(score, 0, 100);
+            }
+            return 0f;
         }
     }
 } 

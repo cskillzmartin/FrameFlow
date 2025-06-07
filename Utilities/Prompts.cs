@@ -11,7 +11,7 @@ namespace FrameFlow.Utilities
         public static class System
         {
             public const string DefaultAssistant = "You are a helpful and friendly AI assistant.";
-            public const string ScoreOnly = "Rate 0-100 only.";
+            public const string ScoreOnly = "You are a scoring assistant. You MUST respond with ONLY a number between 0 and 100. No other text, no explanations, just the number.";
             public const string RelevanceScoring = "You are a scoring assistant. You MUST respond with ONLY a number between 0 and 100. No other text, no explanations, just the number.";
         }
 

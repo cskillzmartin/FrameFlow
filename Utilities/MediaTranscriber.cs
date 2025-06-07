@@ -160,23 +160,7 @@ namespace FrameFlow.Utilities
                     return false;
                 }
 
-                var zipPath = Path.Combine(_workingDirectory, "ffmpeg.zip");
-
-                // Download FFmpeg
-                _progressReporter?.Report(new TranscriptionProgress("Downloading FFmpeg...", 10));
-                using (var response = await _httpClient.GetAsync(downloadUrl))
-                {
-                    response.EnsureSuccessStatusCode();
-                    await using var fileStream = File.Create(zipPath);
-                    await response.Content.CopyToAsync(fileStream);
-                }
-
-                // Extract FFmpeg
-                _progressReporter?.Report(new TranscriptionProgress("Extracting FFmpeg...", 15));
-                await ExtractFFmpegAsync(zipPath);
-
-                // Clean up zip file
-                File.Delete(zipPath);
+                await DownloadAndExtractFFmpegAsync(downloadUrl);
 
                 // Configure FFMpegCore to use our extracted binaries
                 GlobalFFOptions.Configure(new FFOptions { BinaryFolder = _ffmpegDirectory });
@@ -188,6 +172,24 @@ namespace FrameFlow.Utilities
             {
                 _progressReporter?.Report(new TranscriptionProgress($"Failed to download FFmpeg: {ex.Message}", 0));
                 return false;
+            }
+        }
+
+        private async Task DownloadAndExtractFFmpegAsync(string downloadUrl)
+        {
+            var zipPath = Path.Combine(_workingDirectory, "ffmpeg.zip");
+            await DownloadFFmpegFileAsync(downloadUrl, zipPath);
+            await ExtractFFmpegAsync(zipPath);
+            File.Delete(zipPath);
+        }
+
+        private async Task DownloadFFmpegFileAsync(string downloadUrl, string zipPath)
+        {
+            using (var response = await _httpClient.GetAsync(downloadUrl))
+            {
+                response.EnsureSuccessStatusCode();
+                await using var fileStream = File.Create(zipPath);
+                await response.Content.CopyToAsync(fileStream);
             }
         }
 
@@ -364,13 +366,7 @@ namespace FrameFlow.Utilities
                 audioOutputPath ??= Path.Combine(_workingDirectory, $"{Path.GetFileNameWithoutExtension(videoFilePath)}_audio.wav");
 
                 // Modified FFmpeg command to force segmentation
-                await FFMpegArguments
-                    .FromFileInput(videoFilePath)
-                    .OutputToFile(audioOutputPath, true, options => options
-                        .WithAudioCodec("pcm_s16le")
-                        .WithAudioSamplingRate(16000)
-                        .WithCustomArgument("-ac 1"))  // Mono channel)
-                    .ProcessAsynchronously();
+                await ProcessAudioAsync(videoFilePath, audioOutputPath);
 
                 await Task.Delay(10);
 
@@ -382,6 +378,20 @@ namespace FrameFlow.Utilities
                 throw new InvalidOperationException(
                     $"Failed to extract audio: {ex.Message}. " + GetFFmpegInstallationInstructions(), ex);
             }
+        }
+
+        private async Task<string> ProcessAudioAsync(string videoFilePath, string audioOutputPath)
+        {
+            await FFMpegArguments
+                .FromFileInput(videoFilePath)
+                .OutputToFile(audioOutputPath, true, options => options
+                    .WithAudioCodec("pcm_s16le")
+                    .WithAudioSamplingRate(16000)
+                    .WithCustomArgument("-ac 1"))
+                .ProcessAsynchronously();
+
+            await Task.Delay(10);
+            return audioOutputPath;
         }
 
         /// <summary>
@@ -407,7 +417,7 @@ namespace FrameFlow.Utilities
 
                 var segmentCount = 0;
                 var processedDuration = TimeSpan.Zero;
-                var totalDuration = TimeSpan.Zero;
+                var totalDuration = await GetAudioDurationAsync(audioFilePath);
                 var lastProgressUpdate = DateTime.Now;
 
                 // Create file paths
@@ -416,54 +426,14 @@ namespace FrameFlow.Utilities
                 // Create or clear the files
                 File.WriteAllText(srtPath, "");
 
-                // Get audio duration for progress calculation
-                try
-                {
-                    var audioInfo = await FFMpegCore.FFProbe.AnalyseAsync(audioFilePath);
-                    totalDuration = audioInfo.Duration;
-                    _progressReporter?.Report(new TranscriptionProgress($"Audio duration: {totalDuration:mm\\:ss}", 35));
-                }
-                catch
-                {
-                    // If we can't get duration, we'll estimate progress differently
-                    totalDuration = TimeSpan.Zero;
-                }
-
                 await foreach (var transcriptionResult in processor.ProcessAsync(File.OpenRead(audioFilePath)))
                 {
-                    var segment = new TranscriptionSegment
-                    {
-                        Start = transcriptionResult.Start,
-                        End = transcriptionResult.End,
-                        Text = transcriptionResult.Text?.Trim() ?? ""
-                    };
-
-                    // Write segment to SRT file immediately
-                    await AppendSegmentToSrtFile(srtPath, segment, ++segmentCount);
-
-                    processedDuration = transcriptionResult.End;
-
-                    // Update progress every 2 seconds or every 10 segments to avoid UI spam
-                    var now = DateTime.Now;
-                    if ((now - lastProgressUpdate).TotalSeconds >= 2 || segmentCount % 10 == 0)
-                    {
-                        int progressPercent;
-                        string progressMessage;
-
-                        if (totalDuration > TimeSpan.Zero)
-                        {
-                            progressPercent = Math.Min(85, 40 + (int)((processedDuration.TotalSeconds / totalDuration.TotalSeconds) * 45));
-                            progressMessage = $"Transcribing... {processedDuration:mm\\:ss} / {totalDuration:mm\\:ss}";
-                        }
-                        else
-                        {
-                            progressPercent = Math.Min(85, 40 + (segmentCount * 2));
-                            progressMessage = $"Transcribing... {segmentCount} segments processed";
-                        }
-
-                        _progressReporter?.Report(new TranscriptionProgress(progressMessage, progressPercent));
-                        lastProgressUpdate = now;
-                    }
+                    (segmentCount, processedDuration) = await ProcessTranscriptionSegmentAsync(
+                        transcriptionResult, 
+                        srtPath, 
+                        segmentCount,
+                        processedDuration,
+                        totalDuration);
                 }
 
                 _progressReporter?.Report(new TranscriptionProgress("Finalizing transcription...", 90));
@@ -484,11 +454,74 @@ namespace FrameFlow.Utilities
             }
         }
 
+        private async Task<TimeSpan> GetAudioDurationAsync(string audioFilePath)
+        {
+            try
+            {
+                var audioInfo = await FFProbe.AnalyseAsync(audioFilePath);
+                return audioInfo.Duration;
+            }
+            catch
+            {
+                return TimeSpan.Zero;
+            }
+        }
+
+        private async Task<(int segmentCount, TimeSpan processedDuration)> ProcessTranscriptionSegmentAsync(
+            SegmentData transcriptionResult,
+            string srtPath,
+            int currentSegmentCount,
+            TimeSpan currentProcessedDuration,
+            TimeSpan totalDuration)
+        {
+            var segment = new TranscriptionSegment
+            {
+                Start = transcriptionResult.Start,
+                End = transcriptionResult.End,
+                Text = transcriptionResult.Text?.Trim() ?? ""
+            };
+
+            await AppendSegmentToSrtFile(srtPath, segment, currentSegmentCount + 1);
+            var newProcessedDuration = transcriptionResult.End;
+
+            await UpdateTranscriptionProgressAsync(currentSegmentCount + 1, newProcessedDuration, totalDuration);
+            
+            return (currentSegmentCount + 1, newProcessedDuration);
+        }
+
+        private async Task UpdateTranscriptionProgressAsync(
+            int segmentCount,
+            TimeSpan processedDuration,
+            TimeSpan totalDuration)
+        {
+            int progressPercent;
+            string progressMessage;
+
+            if (totalDuration > TimeSpan.Zero)
+            {
+                progressPercent = Math.Min(85, 40 + (int)((processedDuration.TotalSeconds / totalDuration.TotalSeconds) * 45));
+                progressMessage = $"Transcribing... {processedDuration:mm\\:ss} / {totalDuration:mm\\:ss}";
+            }
+            else
+            {
+                progressPercent = Math.Min(85, 40 + (segmentCount * 2));
+                progressMessage = $"Transcribing... {segmentCount} segments processed";
+            }
+
+            _progressReporter?.Report(new TranscriptionProgress(progressMessage, progressPercent));
+        }
+
         private async Task AppendSegmentToSrtFile(string srtPath, TranscriptionSegment segment, int index)
         {
+            var sourceFile = Path.GetFileName(srtPath)
+                .Replace("_audio_transcription.srt", "")
+                .Replace("_transcription.srt", "")
+                + ".mp4";
+
             using var writer = new StreamWriter(srtPath, append: true);
             await writer.WriteLineAsync(index.ToString());
             await writer.WriteLineAsync($"{FormatTimeForSrt(segment.Start)} --> {FormatTimeForSrt(segment.End)}");
+            await writer.WriteLineAsync($"[Source: {sourceFile}]");
             await writer.WriteLineAsync(segment.Text);
             await writer.WriteLineAsync();
         }
@@ -563,6 +596,20 @@ namespace FrameFlow.Utilities
         private static string FormatTimeForSrt(TimeSpan time)
         {
             return $"{time.Hours:00}:{time.Minutes:00}:{time.Seconds:00},{time.Milliseconds:000}";
+        }
+
+        private async Task ConfigureFFmpegAsync()
+        {
+            // Extract from EnsureFFmpegAvailableAsync
+            GlobalFFOptions.Configure(new FFOptions { BinaryFolder = _ffmpegDirectory });
+            var ffmpegBinaryPath = GlobalFFOptions.GetFFMpegBinaryPath();
+            var ffprobeBinaryPath = GlobalFFOptions.GetFFProbeBinaryPath();
+            
+            _progressReporter?.Report(new TranscriptionProgress($"Using FFmpeg: {ffmpegBinaryPath}", 15));
+            _progressReporter?.Report(new TranscriptionProgress($"Using FFprobe: {ffprobeBinaryPath}", 20));
+            
+            var testResult = await TestFFmpegAsync();
+            // ... rest of configuration logic
         }
     }
 

@@ -112,12 +112,22 @@ namespace FrameFlow.Utilities
 
                 // Parse text
                 var textLines = new List<string>();
+                string sourceFile = "";
                 while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]))
                 {
-                    textLines.Add(lines[i]);
+                    var line = lines[i];
+                    if (line.StartsWith("[Source:"))
+                    {
+                        sourceFile = line.Replace("[Source:", "").Replace("]", "").Trim();
+                    }
+                    else
+                    {
+                        textLines.Add(line);
+                    }
                     i++;
                 }
                 var text = string.Join("\n", textLines);
+                
                 // Skip empty line
                 while (i < lines.Length && string.IsNullOrWhiteSpace(lines[i])) i++;
 
@@ -127,9 +137,7 @@ namespace FrameFlow.Utilities
                     Start = start,
                     End = end,
                     Text = text,
-                    SourceFile = Path.GetFileName(filePath)
-                        .Replace("_audio_transcription.srt", ".mp4")
-                        .Replace("_transcription.srt", ".mp4")
+                    SourceFile = sourceFile
                 });
             }
             return segments;
