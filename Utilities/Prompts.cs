@@ -30,9 +30,6 @@ namespace FrameFlow.Utilities
 
             public static string EvaluateNext(string subject, string currentText, string nextText) =>
                 $"Rate 0-100 how well this follows in story about '{subject}'. Current: '{currentText}'. Next: '{nextText}'";
-
-            public static string EvaluateContinuity(string currentText, string nextText) =>
-                $"Rate 0-100 how much this second segment completes or continues the thought from the first segment. First: '{currentText}'. Second: '{nextText}'";
         }
 
         // Transcription prompts
