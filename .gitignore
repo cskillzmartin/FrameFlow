@@ -1,4 +1,7 @@
 bin/
 .vscode/
-models/
+models/cpu/*
+models/cuda/*
+models/directml/*
+models/whisper/*
 obj/
