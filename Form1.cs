@@ -190,7 +190,7 @@ public partial class Form1 : Form
         {
             openFileDialog.Multiselect = true;
             openFileDialog.Title = "Import Media";
-            openFileDialog.Filter = "Audio/Video/Images (*.mp3;*.wav;*.mp4;*.avi;*.mov;*.wmv;*.flac;*.mkv;*.jpg;*.jpeg;*.png)|*.mp3;*.wav;*.mp4;*.avi;*.mov;*.wmv;*.flac;*.mkv;*.jpg;*.jpeg;*.png";
+            openFileDialog.Filter = "Audio/Video/Images (*.mp4;)|*.mp4;";
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 mediaListBox.Items.Clear();
@@ -201,7 +201,7 @@ public partial class Form1 : Form
                 }
 
                 // Automatically transcribe video files
-                var videoExtensions = new[] { ".mp4", ".avi", ".mov", ".wmv", ".mkv" };
+                var videoExtensions = new[] { ".mp4" };
                 var videoFiles = importedFiles
                     .Where(f => videoExtensions.Contains(System.IO.Path.GetExtension(f.FilePath).ToLowerInvariant()))
                     .ToList();
