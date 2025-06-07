@@ -627,7 +627,7 @@ public partial class Form1 : Form
                 }));
                 
                 // Create the final video
-                await videoUtils.CreateEditedVideoAsync(workingSrtPath);
+                await videoUtils.CreateEditedVideoAsync(reorderedSrtPath);
                 
                 // Show success message with file locations
                 MessageBox.Show(
