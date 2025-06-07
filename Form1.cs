@@ -483,33 +483,6 @@ public partial class Form1 : Form
             progressBarAnalysis.Value = 0;
         }));
 
-        // We split the progress into three main steps:
-        // 1. Initial scoring (40% of progress)
-        // 2. Filtering segments (30% of progress)
-        // 3. Reordering segments (30% of progress)
-        const int STEP1_WEIGHT = 40;  // Initial scoring
-        const int STEP2_WEIGHT = 30;  // Filtering
-        const int STEP3_WEIGHT = 30;  // Reordering
-
-        // Helper function to update the progress bar based on which step we're in
-        void UpdateProgressBar(int stepNumber, int stepProgress)
-        {
-            int baseProgress = 0;
-            switch (stepNumber)
-            {
-                case 1:
-                    baseProgress = (stepProgress * STEP1_WEIGHT) / 100;
-                    break;
-                case 2:
-                    baseProgress = STEP1_WEIGHT + (stepProgress * STEP2_WEIGHT) / 100;
-                    break;
-                case 3:
-                    baseProgress = STEP1_WEIGHT + STEP2_WEIGHT + (stepProgress * STEP3_WEIGHT) / 100;
-                    break;
-            }
-            progressBarAnalysis.Invoke((Action)(() => progressBarAnalysis.Value = Math.Min(baseProgress, 100)));
-        }
-
         // Set up our output files:
         // 1. edit.srt - Contains ALL segments with their scores
         // 2. working.edit.srt - Contains SELECTED segments in chronological order

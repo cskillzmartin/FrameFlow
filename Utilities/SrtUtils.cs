@@ -308,7 +308,7 @@ namespace FrameFlow.Utilities
             }
 
             phi.SystemPrompt = Prompts.System.ScoreOnly;
-            string prompt = Prompts.Story.EvaluateStart(subject, truncatedText);
+            string prompt = await Task.Run(() => Prompts.Story.EvaluateStart(subject, truncatedText));
             return float.TryParse(phi.Chat(prompt, addToHistory: false), out float score) ? score : 0f;
         }
 
@@ -332,25 +332,7 @@ namespace FrameFlow.Utilities
             }
 
             phi.SystemPrompt = Prompts.System.ScoreOnly;
-            string prompt = Prompts.Story.EvaluateNext(subject, truncatedCurrent, truncatedNext);
-            return float.TryParse(phi.Chat(prompt, addToHistory: false), out float score) ? score : 0f;
-        }
-
-        public static async Task<float> EvaluateSegmentContinuity(
-            SrtSegment current,
-            SrtSegment next,
-            PhiChatModel phi)
-        {
-            // Truncate both segments to ensure we don't exceed token limit
-            string truncatedCurrent = current.Text.Length > 300 
-                ? current.Text.Substring(0, 300) + "..." 
-                : current.Text;
-            string truncatedNext = next.Text.Length > 300 
-                ? next.Text.Substring(0, 300) + "..."
-                : next.Text;
-
-            phi.SystemPrompt = Prompts.System.ScoreOnly;
-            string prompt = Prompts.Story.EvaluateContinuity(truncatedCurrent, truncatedNext);
+            string prompt = await Task.Run(() => Prompts.Story.EvaluateNext(subject, truncatedCurrent, truncatedNext));
             return float.TryParse(phi.Chat(prompt, addToHistory: false), out float score) ? score : 0f;
         }
     }

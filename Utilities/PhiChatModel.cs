@@ -29,7 +29,7 @@ namespace FrameFlow.Utilities
                            int maxLength = 2048,
                            int minLength = 8,
                            int? randomSeed = null,
-                           string systemPrompt = null)
+                           string? systemPrompt = null)
         {
             try
             {
