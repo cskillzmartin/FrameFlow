@@ -412,12 +412,9 @@ namespace FrameFlow.Utilities
 
                 // Create file paths
                 var srtPath = Path.Combine(_workingDirectory, $"{Path.GetFileNameWithoutExtension(audioFilePath)}_transcription.srt");
-                var jsonPath = Path.Combine(_workingDirectory, $"{Path.GetFileNameWithoutExtension(audioFilePath)}_transcription.json");
 
                 // Create or clear the files
                 File.WriteAllText(srtPath, "");
-                File.WriteAllText(jsonPath, "[");
-                bool isFirstSegment = true;
 
                 // Get audio duration for progress calculation
                 try
@@ -444,10 +441,6 @@ namespace FrameFlow.Utilities
                     // Write segment to SRT file immediately
                     await AppendSegmentToSrtFile(srtPath, segment, ++segmentCount);
 
-                    // Write segment to JSON file immediately
-                    await AppendSegmentToJsonFile(jsonPath, segment, isFirstSegment);
-                    isFirstSegment = false;
-
                     processedDuration = transcriptionResult.End;
 
                     // Update progress every 2 seconds or every 10 segments to avoid UI spam
@@ -473,16 +466,12 @@ namespace FrameFlow.Utilities
                     }
                 }
 
-                // Close the JSON array
-                await File.AppendAllTextAsync(jsonPath, "]");
-
                 _progressReporter?.Report(new TranscriptionProgress("Finalizing transcription...", 90));
 
                 var result = new TranscriptionResult
                 {
                     AudioFilePath = audioFilePath,
-                    SrtFilePath = srtPath,
-                    JsonFilePath = jsonPath
+                    SrtFilePath = srtPath
                 };
 
                 _progressReporter?.Report(new TranscriptionProgress(
@@ -502,17 +491,6 @@ namespace FrameFlow.Utilities
             await writer.WriteLineAsync($"{FormatTimeForSrt(segment.Start)} --> {FormatTimeForSrt(segment.End)}");
             await writer.WriteLineAsync(segment.Text);
             await writer.WriteLineAsync();
-        }
-
-        private async Task AppendSegmentToJsonFile(string jsonPath, TranscriptionSegment segment, bool isFirst)
-        {
-            using var writer = new StreamWriter(jsonPath, append: true);
-            if (!isFirst)
-            {
-                await writer.WriteAsync(",");
-            }
-            var json = JsonSerializer.Serialize(segment, new JsonSerializerOptions { WriteIndented = true });
-            await writer.WriteAsync(json);
         }
 
         /// <summary>
@@ -621,7 +599,6 @@ namespace FrameFlow.Utilities
         public string? VideoFilePath { get; set; }
         public string? AudioFilePath { get; set; }
         public List<TranscriptionSegment> Segments { get; set; } = new();
-        public string? JsonFilePath { get; set; }
         public string? SrtFilePath { get; set; }
         public string? WorkingVideoPath { get; set; }
     }
