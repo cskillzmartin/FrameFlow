@@ -366,22 +366,21 @@ public partial class Form1 : Form
     // Makes sure the format is correct and includes all necessary information
     private async Task WriteSrtFileAsync(string filePath, List<SrtSegment> segments)
     {
-        var sb = new System.Text.StringBuilder();
+        // First clear the file
+        File.WriteAllText(filePath, "");
+        
+        // Then append each segment individually
         for (int i = 0; i < segments.Count; i++)
         {
-            // Write each segment in standard SRT format:
-            // 1. Segment number
-            // 2. Timestamp
-            // 3. Source file
-            // 4. Text content
-            // 5. Blank line
-            sb.AppendLine((i + 1).ToString());
-            sb.AppendLine($"{FrameFlow.Utilities.SrtUtils.FormatTime(segments[i].Start)} --> {FrameFlow.Utilities.SrtUtils.FormatTime(segments[i].End)}");
-            sb.AppendLine($"[Source: {segments[i].SourceFile}]");
-            sb.AppendLine(segments[i].Text);
-            sb.AppendLine();
+            using (var writer = new StreamWriter(filePath, append: true))
+            {
+                await writer.WriteLineAsync((i + 1).ToString());
+                await writer.WriteLineAsync($"{FrameFlow.Utilities.SrtUtils.FormatTime(segments[i].Start)} --> {FrameFlow.Utilities.SrtUtils.FormatTime(segments[i].End)}");
+                await writer.WriteLineAsync($"[Source: {segments[i].SourceFile}]");
+                await writer.WriteLineAsync(segments[i].Text);
+                await writer.WriteLineAsync();
+            }
         }
-        await File.WriteAllTextAsync(filePath, sb.ToString());
     }
 
     // Detects which AI model backend to use based on available hardware
@@ -617,18 +616,8 @@ public partial class Form1 : Form
             }
 
             // Write selected segments to working.edit.srt in chronological order
-            int filteredIndex = 1;
-            foreach (var segment in selectedSegments.OrderBy(s => s.Start))
-            {
-                using (var writer = new StreamWriter(workingSrtPath, true))
-                {
-                    await writer.WriteLineAsync(filteredIndex++.ToString());
-                    await writer.WriteLineAsync($"{FrameFlow.Utilities.SrtUtils.FormatTime(segment.Start)} --> {FrameFlow.Utilities.SrtUtils.FormatTime(segment.End)}");
-                    await writer.WriteLineAsync($"[Source: {segment.SourceFile}]");
-                    await writer.WriteLineAsync(segment.Text);
-                    await writer.WriteLineAsync();
-                }
-            }
+            var chronologicalSegments = selectedSegments.OrderBy(s => s.Start).ToList();
+            await WriteSrtFileAsync(workingSrtPath, chronologicalSegments);
 
             // STEP 3: Create a story-ordered version of the segments
             var selectedSegmentsForReorder = SrtUtils.ParseSrt(workingSrtPath);
@@ -640,7 +629,7 @@ public partial class Form1 : Form
                     progressBarAnalysis.Invoke((Action)(() => progressBarAnalysis.Value = Math.Min(p.PercentComplete, 100)));
                 }));
 
-            // Write the story-ordered version
+            // Write the story-ordered segments
             await WriteSrtFileAsync(reorderedSrtPath, reorderedSegments);
 
             // Clean up memory
