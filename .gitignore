@@ -1,7 +1,10 @@
 bin/
 .vscode/
-models/cpu/*
-models/cuda/*
-models/directml/*
-models/whisper/*
+models/cpu/*.onnx
+models/cpu/*.data
+models/cuda/*.onnx
+models/cuda/*.data
+models/directml/*.onnx
+models/directml/*.data
+models/whisper/*.bin
 obj/
