@@ -19,9 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Models/whisper/ggml-base.bin">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
      <None Include="Models/**/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

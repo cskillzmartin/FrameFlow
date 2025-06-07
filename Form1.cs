@@ -145,20 +145,31 @@ public partial class Form1 : Form
     // Updates the progress bar and status label for a specific file during transcription
     private void UpdateTranscriptionProgress(string filePath, string message, int percent)
     {
-        if (transcriptionProgressBars.TryGetValue(filePath, out var progressBar) &&
-            transcriptionStatusLabels.TryGetValue(filePath, out var label))
-        {
-            progressBar.Value = Math.Clamp(percent, 0, 100);
-            label.Text = System.IO.Path.GetFileName(filePath) + $" - {message} ({percent}%)";
-        }
+           if (transcriptionProgressBars.TryGetValue(filePath, out var progressBar) && transcriptionStatusLabels.TryGetValue(filePath, out var label))
+            {
+                if (progressBar.InvokeRequired || label.InvokeRequired)
+                {
+                    this.Invoke(() => UpdateTranscriptionProgress(filePath, message, percent));
+                    return;
+                }
+
+                progressBar.Value = Math.Clamp(percent, 0, 100);
+                label.Text = System.IO.Path.GetFileName(filePath) + $" - {message} ({percent}%)";
+            }
     }
 
     // Marks a file's transcription as complete in the UI
     private void MarkTranscriptionDone(string filePath)
     {
         if (transcriptionProgressBars.TryGetValue(filePath, out var progressBar) &&
-            transcriptionStatusLabels.TryGetValue(filePath, out var label))
+        transcriptionStatusLabels.TryGetValue(filePath, out var label))
         {
+            if (progressBar.InvokeRequired || label.InvokeRequired)
+            {
+                this.Invoke(() => MarkTranscriptionDone(filePath));
+                return;
+            }
+
             progressBar.Value = 100;
             label.Text = System.IO.Path.GetFileName(filePath) + " - Done";
         }
@@ -376,24 +387,30 @@ public partial class Form1 : Form
     // Detects which AI model backend to use based on available hardware
     private string DetectBestPhiModelBackend()
     {
-        // Look for the model in the application's directory
-        string appPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-        string modelPath = Path.Combine(appPath, "phi-2.Q4_K_M.gguf");
-        
-        // If we don't find it, check common locations
-        if (!File.Exists(modelPath))
-        {
-            modelPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                                   "FrameFlow", "models", "phi-2.Q4_K_M.gguf");
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string cudaPath = Path.Combine(baseDir, "Models", "cuda");
+        string dmlPath = Path.Combine(baseDir, "Models", "directml");
+        string cpuPath = Path.Combine(baseDir, "Models", "cpu");
+
+        // Try CUDA
+        try
+        {          
+            using (var phi = new PhiChatModel(cudaPath))
+                return cudaPath;
         }
-        
-        // Make sure the model exists
-        if (!File.Exists(modelPath))
+        catch (Exception)
+        { }
+
+        // Try DirectML
+        try
         {
-            throw new FileNotFoundException("Could not find phi-2 model file. Please ensure it is installed correctly.");
+            using (var phi = new PhiChatModel(dmlPath))
+                return dmlPath;
         }
-        
-        return modelPath;
+        catch (Exception)
+        { }
+
+        return cpuPath;
     }
 
     // Gets the path to the Whisper model for speech recognition
@@ -401,13 +418,13 @@ public partial class Form1 : Form
     {
         // Look for the model in the application's directory
         string appPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-        string modelPath = Path.Combine(appPath, "whisper-small.en.gguf");
+        string modelPath = Path.Combine(appPath, "Models", "whisper", "ggml-base.bin");
         
         // If we don't find it, check common locations
         if (!File.Exists(modelPath))
         {
             modelPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                                   "FrameFlow", "models", "whisper-small.en.gguf");
+                                   "FrameFlow", "Models", "whisper" , "ggml-base.bin");
         }
         
         // Make sure the model exists

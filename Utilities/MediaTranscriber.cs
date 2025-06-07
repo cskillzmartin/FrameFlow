@@ -369,9 +369,10 @@ namespace FrameFlow.Utilities
                     .OutputToFile(audioOutputPath, true, options => options
                         .WithAudioCodec("pcm_s16le")
                         .WithAudioSamplingRate(16000)
-                        .WithCustomArgument("-ac 1")  // Mono channel
-                        .WithCustomArgument("-af silencedetect=n=-35dB:d=0.1,asegment=time=1:overlap=0.1")) // Force 1-second segments with slight overlap
+                        .WithCustomArgument("-ac 1"))  // Mono channel)
                     .ProcessAsynchronously();
+
+                await Task.Delay(10);
 
                 _progressReporter?.Report(new TranscriptionProgress(Prompts.Transcription.AudioExtractionComplete, 40));
                 return audioOutputPath;
@@ -402,9 +403,6 @@ namespace FrameFlow.Utilities
                 // Configure Whisper for shorter segments
                 using var processor = factory.CreateBuilder()
                     .WithLanguage("auto")
-                    .WithMaxSegmentLength(1) // Keep this for safety
-                    .WithTokenTimestamps()
-                    .WithDuration(TimeSpan.FromSeconds(1))
                     .Build();
 
                 var segmentCount = 0;
