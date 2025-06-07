@@ -508,7 +508,7 @@ namespace FrameFlow.Utilities
                 progressMessage = $"Transcribing... {segmentCount} segments processed";
             }
 
-            _progressReporter?.Report(new TranscriptionProgress(progressMessage, progressPercent));
+           await Task.Run(() => _progressReporter?.Report(new TranscriptionProgress(progressMessage, progressPercent)));
         }
 
         private async Task AppendSegmentToSrtFile(string srtPath, TranscriptionSegment segment, int index)
