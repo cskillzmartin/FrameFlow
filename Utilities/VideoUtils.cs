@@ -55,17 +55,8 @@ namespace FrameFlow.Utilities
                     Debug.WriteLine($"\nProcessing segment {i + 1}:");
                     Debug.WriteLine($"Text: {segment.Text}");
                     Debug.WriteLine($"Time: {segment.Start} -> {segment.End}");
-                    
-                    var sourceMatch = Regex.Match(segment.Text, @"\[Source:\s*([^\]]+)\]");
-                    if (!sourceMatch.Success)
-                    {
-                        Debug.WriteLine("Source match failed. Full text:");
-                        Debug.WriteLine(segment.Text);
-                        throw new Exception($"Could not find source video information in segment text");
-                    }
-                    
-                    string videoFileName = sourceMatch.Groups[1].Value.Trim();
-                    string sourceVideoPath = Path.Combine(_projectDir, videoFileName);
+                 
+                    string sourceVideoPath = Path.Combine(_projectDir, segment.SourceFile);
                     Debug.WriteLine($"Video path: {sourceVideoPath}");
 
                     if (!File.Exists(sourceVideoPath))
@@ -79,7 +70,7 @@ namespace FrameFlow.Utilities
                             Debug.WriteLine($"  {video}");
                         }
                         throw new FileNotFoundException(
-                            $"Source video not found for: {videoFileName}\n" +
+                            $"Source video not found for: {segment.SourceFile}\n" +
                             $"Available videos: {string.Join(", ", availableVideos)}");
                     }
 
