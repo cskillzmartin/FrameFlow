@@ -211,7 +211,7 @@ public partial class Form1 : Form
 
                 if (videoFiles.Any())
                 {
-                    const int maxConcurrent = 10;
+                    const int maxConcurrent = 3;
                     var processingQueue = new Queue<MediaFileItem>(videoFiles);
                     var currentlyProcessing = new HashSet<string>(); // Track files being processed
                     var completedCount = 0;
@@ -243,7 +243,24 @@ public partial class Form1 : Form
                                 try
                                 {
                                     await transcriptionUtility.TranscribeVideoAsync(filePath, whisperModelPath);
-                                    MarkTranscriptionDone(filePath);
+                                    
+                                    // Update UI to show completion and remove progress bar
+                                    this.Invoke((Action)(() =>
+                                    {
+                                        if (transcriptionProgressBars.TryGetValue(filePath, out var progressBar) &&
+                                            transcriptionStatusLabels.TryGetValue(filePath, out var label))
+                                        {
+                                            // Fade out completed progress bar and label
+                                            FadeOutAndRemoveControls(progressBar, label);
+                                            
+                                            // Remove from dictionaries
+                                            transcriptionProgressBars.Remove(filePath);
+                                            transcriptionStatusLabels.Remove(filePath);
+                                            
+                                            // Reposition remaining progress bars
+                                            RepositionProgressBars();
+                                        }
+                                    }));
                                     
                                     // Update completion status
                                     Interlocked.Increment(ref completedCount);
@@ -284,6 +301,76 @@ public partial class Form1 : Form
                     transcriptionStatusLabels.Clear();
                 }
             }
+        }
+    }
+
+    // Modified helper method to fade out and remove completed progress bars
+    private async void FadeOutAndRemoveControls(ProgressBar progressBar, Label label)
+    {
+        try
+        {
+            // Animate fade out for label only (since ProgressBar doesn't support transparency)
+            for (double opacity = 1.0; opacity > 0; opacity -= 0.1)
+            {
+                // Only fade the label
+                label.ForeColor = Color.FromArgb((int)(opacity * 255), label.ForeColor);
+                
+                // For ProgressBar, we'll gradually change its value to 0
+                progressBar.Value = (int)(opacity * progressBar.Value);
+                
+                await Task.Delay(50);
+            }
+            
+            // Remove controls
+            this.Invoke((Action)(() =>
+            {
+                if (!panelTranscriptionProgress.IsDisposed && !progressBar.IsDisposed && !label.IsDisposed)
+                {
+                    panelTranscriptionProgress.Controls.Remove(progressBar);
+                    panelTranscriptionProgress.Controls.Remove(label);
+                    progressBar.Dispose();
+                    label.Dispose();
+                }
+            }));
+        }
+        catch (ObjectDisposedException)
+        {
+            // Handle case where controls might have been disposed
+        }
+        catch (InvalidOperationException)
+        {
+            // Handle case where form might be closing
+        }
+    }
+
+    // Modified helper method to reposition remaining progress bars with safety checks
+    private void RepositionProgressBars()
+    {
+        try
+        {
+            this.Invoke((Action)(() =>
+            {
+                int y = 10;
+                foreach (var kvp in transcriptionProgressBars.ToList()) // Create a copy to avoid modification during enumeration
+                {
+                    if (!kvp.Value.IsDisposed && transcriptionStatusLabels.TryGetValue(kvp.Key, out var label) && !label.IsDisposed)
+                    {
+                        var progressBar = kvp.Value;
+                        
+                        label.Location = new Point(10, y);
+                        progressBar.Location = new Point(10, y + 20);
+                        y += 50;
+                    }
+                }
+            }));
+        }
+        catch (ObjectDisposedException)
+        {
+            // Handle case where controls might have been disposed
+        }
+        catch (InvalidOperationException)
+        {
+            // Handle case where form might be closing
         }
     }
 
