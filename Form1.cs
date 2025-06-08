@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Threading;
 
 public partial class Form1 : Form
 {
@@ -114,13 +115,16 @@ public partial class Form1 : Form
         panelTranscriptionProgress.Controls.Clear();
         transcriptionProgressBars.Clear();
         transcriptionStatusLabels.Clear();
+        
         int y = 10;
         int margin = 20;
+        
+        // Create progress bars for all files upfront
         foreach (var file in files)
         {
             var label = new Label
             {
-                Text = file.FileName + " - Starting...",
+                Text = file.FileName + " - Queued",
                 ForeColor = System.Drawing.Color.White,
                 Location = new System.Drawing.Point(10, y),
                 AutoSize = true
@@ -139,6 +143,7 @@ public partial class Form1 : Form
             transcriptionStatusLabels[file.FilePath] = label;
             y += 50;
         }
+        
         panelTranscriptionProgress.Visible = true;
     }
 
@@ -175,10 +180,8 @@ public partial class Form1 : Form
         }
     }
 
-    // Handles importing media files into the project
-    // 1. Lets user select files
-    // 2. Adds them to the media list
-    // 3. Automatically starts transcription for video files
+    // Handles importing media files into the project using a queue system
+    // maintaining 10 concurrent operations at all times
     private async void importMediaButton_Click(object sender, EventArgs e)
     {
         // Prompt for project if not set
@@ -205,30 +208,80 @@ public partial class Form1 : Form
                 var videoFiles = importedFiles
                     .Where(f => videoExtensions.Contains(System.IO.Path.GetExtension(f.FilePath).ToLowerInvariant()))
                     .ToList();
+
                 if (videoFiles.Any())
                 {
-                    this.Text = $"FrameFlow - Project: {projectName} - Transcribing Files...";
-                    ShowTranscriptionProgressPanel(videoFiles);
+                    const int maxConcurrent = 10;
+                    var processingQueue = new Queue<MediaFileItem>(videoFiles);
+                    var currentlyProcessing = new HashSet<string>(); // Track files being processed
+                    var completedCount = 0;
+                    var totalFiles = videoFiles.Count;
+                    var activeTasks = new List<Task>();
                     string whisperModelPath = GetWhisperModelPath();
 
-                    var tasks = videoFiles.Select(video =>
-                    {
-                        var filePath = video.FilePath;
-                        var progress = new Progress<FrameFlow.Utilities.TranscriptionProgress>(p =>
-                        {
-                            UpdateTranscriptionProgress(filePath, p.Message, p.PercentComplete);
-                        });
-                        var transcriptionUtility = new FrameFlow.Utilities.VideoTranscriptionUtility(projectWorkingDir, progress);
-                        return Task.Run(async () =>
-                        {
-                            await transcriptionUtility.TranscribeVideoAsync(filePath, whisperModelPath);
-                            MarkTranscriptionDone(filePath);
-                        });
-                    }).ToList();
+                    this.Text = $"FrameFlow - Project: {projectName} - Transcribed Files (0/{totalFiles})...";
+                    ShowTranscriptionProgressPanel(videoFiles);
 
-                    await Task.WhenAll(tasks);
+                    // Process queue until empty
+                    while (processingQueue.Count > 0 || activeTasks.Count > 0)
+                    {
+                        // Start new tasks if we have capacity and files to process
+                        while (activeTasks.Count < maxConcurrent && processingQueue.Count > 0)
+                        {
+                            var video = processingQueue.Dequeue();
+                            var filePath = video.FilePath;
+                            currentlyProcessing.Add(filePath);
+
+                            var progress = new Progress<FrameFlow.Utilities.TranscriptionProgress>(p =>
+                            {
+                                UpdateTranscriptionProgress(filePath, p.Message, p.PercentComplete);
+                            });
+
+                            var transcriptionUtility = new FrameFlow.Utilities.VideoTranscriptionUtility(projectWorkingDir, progress);
+                            var task = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await transcriptionUtility.TranscribeVideoAsync(filePath, whisperModelPath);
+                                    MarkTranscriptionDone(filePath);
+                                    
+                                    // Update completion status
+                                    Interlocked.Increment(ref completedCount);
+                                    this.Invoke((Action)(() =>
+                                    {
+                                        this.Text = $"FrameFlow - Project: {projectName} - Transcribed Files ({completedCount}/{totalFiles})...";
+                                    }));
+                                }
+                                catch (Exception ex)
+                                {
+                                    this.Invoke((Action)(() =>
+                                    {
+                                        MessageBox.Show($"Error processing {Path.GetFileName(filePath)}: {ex.Message}", 
+                                            "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                    }));
+                                }
+                                finally
+                                {
+                                    currentlyProcessing.Remove(filePath);
+                                }
+                            });
+
+                            activeTasks.Add(task);
+                        }
+
+                        // Wait for at least one task to complete before checking queue again
+                        if (activeTasks.Count > 0)
+                        {
+                            var completedTask = await Task.WhenAny(activeTasks);
+                            activeTasks.Remove(completedTask);
+                        }
+                    }
+
+                    // Clean up UI
                     panelTranscriptionProgress.Visible = false;
                     this.Text = $"FrameFlow - Project: {projectName}";
+                    transcriptionProgressBars.Clear();
+                    transcriptionStatusLabels.Clear();
                 }
             }
         }
