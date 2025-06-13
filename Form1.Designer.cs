@@ -6,6 +6,34 @@ partial class Form1
     ///  Required designer variable.
     /// </summary>
     private System.ComponentModel.IContainer components = null;
+    private System.Windows.Forms.SplitContainer splitContainer1;
+    private System.Windows.Forms.TableLayoutPanel leftTableLayout;
+    private System.Windows.Forms.Button btnImportMedia;
+    private System.Windows.Forms.MenuStrip menuStrip1;
+    private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem newProjectToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem openProjectToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem importMediaToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem settingsToolStripMenuItem;
+    private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+    private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
+    private System.Windows.Forms.Label topLabel;
+    private System.Windows.Forms.Label middleLabel;
+    private System.Windows.Forms.ListView mediaListView;
+    private System.Windows.Forms.Label promptLabel;
+    private System.Windows.Forms.TextBox promptTextBox;
+    private System.Windows.Forms.TableLayoutPanel rightTableLayout;
+    private System.Windows.Forms.Button generateButton;
+    private System.Windows.Forms.TextBox debugTextBox;
+    private NumericUpDown relevanceWeightInput;
+    private NumericUpDown sentimentWeightInput;
+    private NumericUpDown noveltyWeightInput;
+    private NumericUpDown energyWeightInput;
+    private Label weightLabel;
+    private TableLayoutPanel weightPanel;
+    private ComboBox lengthInput;
 
     /// <summary>
     ///  Clean up any resources being used.
@@ -28,244 +56,313 @@ partial class Form1
     /// </summary>
     private void InitializeComponent()
     {
-        this.leftPanel = new System.Windows.Forms.Panel();
-        this.centerPanel = new System.Windows.Forms.Panel();
-        this.rightPanel = new System.Windows.Forms.Panel();
-        this.importMediaButton = new System.Windows.Forms.Button();
-        this.mediaListBox = new System.Windows.Forms.ListBox();
-        this.panelTranscriptionProgress = new System.Windows.Forms.Panel();
-        this.subjectLabel = new System.Windows.Forms.Label();
-        this.subjectTextBox = new System.Windows.Forms.TextBox();
-        this.durationComboBox = new System.Windows.Forms.ComboBox();
-        this.customDurationComboBox = new System.Windows.Forms.ComboBox();
-        this.lengthLabel = new System.Windows.Forms.Label();
-        this.minLabel = new System.Windows.Forms.Label();
-        this.btnAnalyzeAndEditSrt = new System.Windows.Forms.Button();
-        this.progressBarAnalysis = new System.Windows.Forms.ProgressBar();
-        this.mainToolStrip = new System.Windows.Forms.ToolStrip();
-        this.btnNewProject = new System.Windows.Forms.ToolStripButton();
-        this.btnOpenProject = new System.Windows.Forms.ToolStripButton();
-        this.btnSettings = new System.Windows.Forms.ToolStripButton();
-        this.SuspendLayout();
+        menuStrip1 = new MenuStrip();
+        fileToolStripMenuItem = new ToolStripMenuItem();
+        newProjectToolStripMenuItem = new ToolStripMenuItem();
+        openProjectToolStripMenuItem = new ToolStripMenuItem();
+        importMediaToolStripMenuItem = new ToolStripMenuItem();
+        settingsToolStripMenuItem = new ToolStripMenuItem();
+        toolStripSeparator1 = new ToolStripSeparator();
+        exitToolStripMenuItem = new ToolStripMenuItem();
+        helpToolStripMenuItem = new ToolStripMenuItem();
+        aboutToolStripMenuItem = new ToolStripMenuItem();
+        splitContainer1 = new SplitContainer();
+        btnImportMedia = new Button();
+        leftTableLayout = new TableLayoutPanel();
 
-        // 
-        // mainToolStrip
-        // 
-        this.mainToolStrip.BackColor = System.Drawing.Color.FromArgb(45, 45, 45);
-        this.mainToolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.btnNewProject,
-            this.btnOpenProject,
-            this.btnSettings
-        });
-        this.mainToolStrip.Location = new System.Drawing.Point(0, 0);
-        this.mainToolStrip.Name = "mainToolStrip";
-        this.mainToolStrip.Size = new System.Drawing.Size(800, 25);
-        this.mainToolStrip.TabIndex = 0;
-        this.mainToolStrip.ForeColor = System.Drawing.Color.White;
+        // MenuStrip setup
+        menuStrip1.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
+        splitContainer1.Panel1.SuspendLayout();
+        splitContainer1.SuspendLayout();
+        SuspendLayout();
 
-        // 
-        // btnNewProject
-        // 
-        this.btnNewProject.Text = "New Project";
-        this.btnNewProject.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-        this.btnNewProject.ForeColor = System.Drawing.Color.White;
+        // menuStrip1
+        menuStrip1.Items.AddRange(new ToolStripItem[] {
+            fileToolStripMenuItem,
+            helpToolStripMenuItem});
+        menuStrip1.Location = new Point(0, 0);
+        menuStrip1.Name = "menuStrip1";
+        menuStrip1.Size = new Size(800, 24);
+        menuStrip1.TabIndex = 0;
+        menuStrip1.Text = "menuStrip1";
 
-        // 
-        // btnOpenProject
-        // 
-        this.btnOpenProject.Text = "Open Project";
-        this.btnOpenProject.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-        this.btnOpenProject.ForeColor = System.Drawing.Color.White;
+        // fileToolStripMenuItem
+        fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] {
+            newProjectToolStripMenuItem,
+            openProjectToolStripMenuItem,
+            new ToolStripSeparator(),
+            importMediaToolStripMenuItem,
+            new ToolStripSeparator(),
+            settingsToolStripMenuItem,
+            toolStripSeparator1,
+            exitToolStripMenuItem});
+        fileToolStripMenuItem.Name = "fileToolStripMenuItem";
+        fileToolStripMenuItem.Size = new Size(37, 20);
+        fileToolStripMenuItem.Text = "&File";
 
-        // 
-        // btnSettings
-        // 
-        this.btnSettings.Text = "Settings";
-        this.btnSettings.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-        this.btnSettings.ForeColor = System.Drawing.Color.White;
+        // newProjectToolStripMenuItem
+        newProjectToolStripMenuItem.Name = "newProjectToolStripMenuItem";
+        newProjectToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.N;
+        newProjectToolStripMenuItem.Size = new Size(180, 22);
+        newProjectToolStripMenuItem.Text = "&New Project...";
 
-        // 
-        // leftPanel
-        // 
-        this.leftPanel.Dock = System.Windows.Forms.DockStyle.Left;
-        this.leftPanel.Location = new System.Drawing.Point(0, 25);
-        this.leftPanel.Name = "leftPanel";
-        this.leftPanel.Size = new System.Drawing.Size(200, 425);
-        this.leftPanel.TabIndex = 0;
-        this.leftPanel.BackColor = System.Drawing.Color.FromArgb(30, 30, 30);
-        // Adjust button locations and stack them vertically in leftPanel
-        int buttonWidth = 180;
-        int buttonHeight = 40;
-        int buttonSpacing = 10;
-        int y = 10;
-        this.importMediaButton.Size = new System.Drawing.Size(buttonWidth, buttonHeight);
-        this.importMediaButton.Location = new System.Drawing.Point(10, y);
-        y += buttonHeight + buttonSpacing;
-        this.btnAnalyzeAndEditSrt.Size = new System.Drawing.Size(buttonWidth, buttonHeight);
-        this.btnAnalyzeAndEditSrt.Location = new System.Drawing.Point(10, y);
-        y += buttonHeight + buttonSpacing;
-        // Move mediaListBox below all buttons
-        this.mediaListBox.Size = new System.Drawing.Size(buttonWidth, 350);
-        this.mediaListBox.Location = new System.Drawing.Point(10, y);
-        // Add all buttons to leftPanel
-        this.leftPanel.Controls.Add(this.importMediaButton);
-        this.leftPanel.Controls.Add(this.btnAnalyzeAndEditSrt);
-        this.leftPanel.Controls.Add(this.mediaListBox);
-        this.leftPanel.Controls.Add(this.panelTranscriptionProgress);
-        // 
-        // centerPanel
-        // 
-        this.centerPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-        this.centerPanel.Location = new System.Drawing.Point(200, 25);
-        this.centerPanel.Name = "centerPanel";
-        this.centerPanel.Size = new System.Drawing.Size(400, 425);
-        this.centerPanel.TabIndex = 1;
-        this.centerPanel.BackColor = System.Drawing.Color.FromArgb(45, 45, 45);
-        this.centerPanel.Controls.Add(this.panelTranscriptionProgress);
-        this.centerPanel.Controls.Add(this.subjectLabel);
-        this.centerPanel.Controls.Add(this.subjectTextBox);
-        this.centerPanel.Controls.Add(this.durationComboBox);
-        this.centerPanel.Controls.Add(this.customDurationComboBox);
-        this.centerPanel.Controls.Add(this.lengthLabel);
-        this.centerPanel.Controls.Add(this.minLabel);
-        // 
-        // rightPanel
-        // 
-        this.rightPanel.Dock = System.Windows.Forms.DockStyle.Right;
-        this.rightPanel.Location = new System.Drawing.Point(600, 25);
-        this.rightPanel.Name = "rightPanel";
-        this.rightPanel.Size = new System.Drawing.Size(200, 425);
-        this.rightPanel.TabIndex = 2;
-        this.rightPanel.BackColor = System.Drawing.Color.FromArgb(30, 30, 30);
-        // 
-        // panelTranscriptionProgress
-        // 
-        this.panelTranscriptionProgress.Name = "panelTranscriptionProgress";
-        this.panelTranscriptionProgress.Size = this.mediaListBox.Size;
-        this.panelTranscriptionProgress.Location = this.mediaListBox.Location;
-        this.panelTranscriptionProgress.BackColor = System.Drawing.Color.FromArgb(180, 40, 40, 40);
-        this.panelTranscriptionProgress.Visible = false;
-        this.panelTranscriptionProgress.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left;
-        this.leftPanel.Controls.Add(this.panelTranscriptionProgress);
-        this.panelTranscriptionProgress.BringToFront();
-        // 
-        // subjectLabel
-        // 
-        this.subjectLabel.Text = "Subject:";
-        this.subjectLabel.ForeColor = System.Drawing.Color.White;
-        this.subjectLabel.Location = new System.Drawing.Point(20, 20);
-        this.subjectLabel.Size = new System.Drawing.Size(100, 20);
-        // 
-        // subjectTextBox
-        // 
-        this.subjectTextBox.Multiline = true;
-        this.subjectTextBox.Location = new System.Drawing.Point(20, 45);
-        this.subjectTextBox.Size = new System.Drawing.Size(360, 60);
-        this.subjectTextBox.BackColor = System.Drawing.Color.FromArgb(60, 60, 60);
-        this.subjectTextBox.ForeColor = System.Drawing.Color.White;
-        // 
-        // durationComboBox
-        // 
-        this.durationComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-        this.durationComboBox.Items.AddRange(new object[] { "<= 60 Seconds", "<=10 Min", "<=20 Min", "Custom" });
-        this.durationComboBox.Location = new System.Drawing.Point(20, 140);
-        this.durationComboBox.Size = new System.Drawing.Size(180, 23);
-        this.durationComboBox.SelectedIndex = 0;
-        this.durationComboBox.SelectedIndexChanged += new System.EventHandler(this.durationComboBox_SelectedIndexChanged);
-        // 
-        // customDurationComboBox
-        // 
-        this.customDurationComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-        for (int i = 1; i <= 100; i++) this.customDurationComboBox.Items.Add(i.ToString());
-        this.customDurationComboBox.Location = new System.Drawing.Point(220, 140);
-        this.customDurationComboBox.Size = new System.Drawing.Size(80, 23);
-        this.customDurationComboBox.Visible = false;
-        // 
-        // lengthLabel
-        // 
-        this.lengthLabel.Text = "Length:";
-        this.lengthLabel.ForeColor = System.Drawing.Color.White;
-        this.lengthLabel.Location = new System.Drawing.Point(20, 120);
-        this.lengthLabel.Size = new System.Drawing.Size(100, 20);
-        // 
-        // minLabel
-        // 
-        this.minLabel.Text = "Min";
-        this.minLabel.ForeColor = System.Drawing.Color.White;
-        this.minLabel.Location = new System.Drawing.Point(220, 120);
-        this.minLabel.Size = new System.Drawing.Size(80, 20);
-        this.minLabel.Visible = false;
-        // 
-        // Form1
-        // 
-        this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-        this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(800, 450);
-        this.Controls.Add(this.centerPanel);
-        this.Controls.Add(this.rightPanel);
-        this.Controls.Add(this.leftPanel);
-        this.Controls.Add(this.mainToolStrip);
-        this.Controls.Add(this.progressBarAnalysis);
-        this.Name = "Form1";
-        this.Text = "FrameFlow";
-        // Fix button text visibility and responsive layout
-        this.btnAnalyzeAndEditSrt.AutoSize = false;
-        this.btnAnalyzeAndEditSrt.UseVisualStyleBackColor = true;
-        // Adjust mediaListBox height to fit within leftPanel
-        this.mediaListBox.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right | System.Windows.Forms.AnchorStyles.Bottom;
-        this.mediaListBox.Height = this.leftPanel.Height - (this.btnAnalyzeAndEditSrt.Location.Y + this.btnAnalyzeAndEditSrt.Height + 20);
-        // Optionally, handle leftPanel resize to keep mediaListBox within bounds
-        this.leftPanel.Resize += (s, e) => {
-            this.mediaListBox.Height = this.leftPanel.Height - (this.btnAnalyzeAndEditSrt.Location.Y + this.btnAnalyzeAndEditSrt.Height + 20);
+        // openProjectToolStripMenuItem
+        openProjectToolStripMenuItem.Name = "openProjectToolStripMenuItem";
+        openProjectToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.P;
+        openProjectToolStripMenuItem.Size = new Size(180, 22);
+        openProjectToolStripMenuItem.Text = "&Open Project...";
+
+        // importMediaToolStripMenuItem
+        importMediaToolStripMenuItem.Name = "importMediaToolStripMenuItem";
+        importMediaToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.O;
+        importMediaToolStripMenuItem.Size = new Size(180, 22);
+        importMediaToolStripMenuItem.Text = "&Import Media...";
+
+        // settingsToolStripMenuItem
+        settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
+        settingsToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.S;
+        settingsToolStripMenuItem.Size = new Size(180, 22);
+        settingsToolStripMenuItem.Text = "&Settings...";
+
+        // toolStripSeparator1
+        toolStripSeparator1.Name = "toolStripSeparator1";
+        toolStripSeparator1.Size = new Size(177, 6);
+
+        // exitToolStripMenuItem
+        exitToolStripMenuItem.Name = "exitToolStripMenuItem";
+        exitToolStripMenuItem.ShortcutKeys = Keys.Alt | Keys.F4;
+        exitToolStripMenuItem.Size = new Size(180, 22);
+        exitToolStripMenuItem.Text = "E&xit";
+
+        // helpToolStripMenuItem
+        helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] {
+            aboutToolStripMenuItem});
+        helpToolStripMenuItem.Name = "helpToolStripMenuItem";
+        helpToolStripMenuItem.Size = new Size(44, 20);
+        helpToolStripMenuItem.Text = "&Help";
+
+        // aboutToolStripMenuItem
+        aboutToolStripMenuItem.Name = "aboutToolStripMenuItem";
+        aboutToolStripMenuItem.Size = new Size(180, 22);
+        aboutToolStripMenuItem.Text = "&About";
+
+        // splitContainer1 left / right layout
+        splitContainer1.Dock = DockStyle.Fill;
+        splitContainer1.Location = new Point(0, 24);
+        splitContainer1.Name = "splitContainer1";
+        splitContainer1.Panel1MinSize = 200;
+        splitContainer1.Panel2MinSize = 200;
+        splitContainer1.Size = new Size(800, 426);
+        splitContainer1.SplitterDistance = 266;
+        splitContainer1.TabIndex = 1;
+
+        // Create TableLayoutPanel for left side
+        leftTableLayout.Dock = DockStyle.Fill;
+        leftTableLayout.ColumnCount = 1;
+        leftTableLayout.RowCount = 2;
+        
+        // Set each row to take up 33.33% of the space
+        leftTableLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 39.5F));
+        leftTableLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 60.5F));
+
+        
+        // Add the TableLayoutPanel to the left panel
+        splitContainer1.Panel1.Controls.Add(leftTableLayout);
+
+        // Create placeholder labels
+        topLabel = new Label();
+        topLabel.Text = "Holder... 😉";
+        topLabel.Dock = DockStyle.Fill;
+        topLabel.TextAlign = ContentAlignment.MiddleCenter;
+
+        // Create and setup media ListView
+        mediaListView = new ListView();
+        mediaListView.Dock = DockStyle.Fill;
+        mediaListView.View = View.List;
+        mediaListView.FullRowSelect = true;
+
+        // Create a Panel to hold both the button and ListView
+        Panel mediaPanel = new Panel();
+        mediaPanel.Dock = DockStyle.Fill;
+
+        // Configure Import Media button
+        btnImportMedia.Dock = DockStyle.Top;
+        btnImportMedia.Height = 30;
+
+        // Add controls in correct order (first added is at the bottom)
+        mediaPanel.Controls.Add(mediaListView);    // ListView will be on top
+        mediaPanel.Controls.Add(btnImportMedia);   // Button will be at bottom
+
+        // Update the table layout controls
+        leftTableLayout.Controls.Add(mediaPanel, 0, 0);
+        leftTableLayout.Controls.Add(topLabel, 0, 1);
+        
+        // btnImportMedia
+        btnImportMedia.Location = new Point(12, 12);
+        btnImportMedia.Name = "btnImportMedia";
+        btnImportMedia.AutoSize = true;
+        btnImportMedia.TabIndex = 0;
+        btnImportMedia.Text = "Import Media +";
+        btnImportMedia.UseVisualStyleBackColor = true;
+
+        // Create right panel layout
+        rightTableLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 5,
+            Padding = new Padding(10)
         };
-        // Style all project action buttons for dark background
-        var buttonBackColor = System.Drawing.Color.FromArgb(45, 45, 45);
-        var buttonForeColor = System.Drawing.Color.White;
-        var buttonFont = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-        this.importMediaButton.FlatStyle = System.Windows.Forms.FlatStyle.Standard;
-        this.importMediaButton.BackColor = buttonBackColor;
-        this.importMediaButton.ForeColor = buttonForeColor;
-        this.importMediaButton.Font = buttonFont;
-        this.btnAnalyzeAndEditSrt.FlatStyle = System.Windows.Forms.FlatStyle.Standard;
-        this.btnAnalyzeAndEditSrt.BackColor = buttonBackColor;
-        this.btnAnalyzeAndEditSrt.ForeColor = buttonForeColor;
-        this.btnAnalyzeAndEditSrt.Font = buttonFont;
-        // Explicitly set ForeColor to white for all buttons at the end
-        this.importMediaButton.ForeColor = System.Drawing.Color.White;
-        this.btnAnalyzeAndEditSrt.ForeColor = System.Drawing.Color.White;
-        this.progressBarAnalysis.Name = "progressBarAnalysis";
-        this.progressBarAnalysis.Dock = System.Windows.Forms.DockStyle.Top;
-        this.progressBarAnalysis.Height = 8;
-        this.progressBarAnalysis.Visible = false;
-        this.progressBarAnalysis.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
-        this.progressBarAnalysis.ForeColor = System.Drawing.Color.DeepSkyBlue;
-        this.Controls.Add(this.progressBarAnalysis);
-        this.progressBarAnalysis.BringToFront();
-        this.mainToolStrip.ResumeLayout(false);
-        this.mainToolStrip.PerformLayout();
-        this.ResumeLayout(false);
-        this.PerformLayout();
+
+        // Setup prompt label
+        promptLabel = new Label
+        {
+            Text = "Prompt",
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 5)
+        };
+
+        // Setup prompt textbox
+        promptTextBox = new TextBox
+        {
+            Multiline = true,
+            ScrollBars = ScrollBars.Vertical,
+            Dock = DockStyle.Fill,
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            Font = new Font("Segoe UI", 10F),
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Margin = new Padding(0, 0, 0, 10),
+            Height = Font.Height * 5
+        };
+
+        // Create weight panel
+        weightPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 10,
+            RowCount = 2,
+            Margin = new Padding(0, 10, 0, 10),
+            AutoSize = true
+        };
+
+        // Create weight controls
+        relevanceWeightInput = CreateWeightInput("Relevance", 100);
+        sentimentWeightInput = CreateWeightInput("Sentiment", 25);
+        noveltyWeightInput = CreateWeightInput("Novelty", 25);
+        energyWeightInput = CreateWeightInput("Energy", 25);
+
+        // Create length dropdown
+        lengthInput = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 60,
+            Margin = new Padding(0, 0, 10, 0)
+        };
+        // Populate length dropdown with values 1-100
+        for (int i = 1; i <= 100; i++)
+        {
+            lengthInput.Items.Add(i.ToString());
+        }
+        lengthInput.SelectedIndex = 0; // Select first item by default
+
+        // Add labels to top row
+        weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Sentiment"), 2, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Novelty"), 4, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Energy"), 6, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Length"), 8, 0);
+
+        // Add controls to bottom row
+        weightPanel.Controls.Add(relevanceWeightInput, 0, 1);
+        weightPanel.Controls.Add(sentimentWeightInput, 2, 1);
+        weightPanel.Controls.Add(noveltyWeightInput, 4, 1);
+        weightPanel.Controls.Add(energyWeightInput, 6, 1);
+        weightPanel.Controls.Add(lengthInput, 8, 1);
+
+        // Create generate button
+        generateButton = new Button
+        {
+            Text = "Generate",
+            Dock = DockStyle.Fill,
+            Height = 35,
+            BackColor = Color.FromArgb(0, 122, 204),
+            ForeColor = Color.White,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+
+        // Create debug textbox
+        debugTextBox = new TextBox
+        {
+            Multiline = true,
+            ScrollBars = ScrollBars.Both,
+            Dock = DockStyle.Fill,
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            Font = new Font("Consolas", 9F),
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            WordWrap = true
+        };
+
+        // Add all controls to right layout
+        rightTableLayout.Controls.Add(promptLabel, 0, 0);
+        rightTableLayout.Controls.Add(promptTextBox, 0, 1);
+        rightTableLayout.Controls.Add(weightPanel, 0, 2);
+        rightTableLayout.Controls.Add(generateButton, 0, 3);
+        rightTableLayout.Controls.Add(debugTextBox, 0, 4);
+
+        // Add right layout to split container
+        splitContainer1.Panel2.Controls.Add(rightTableLayout);
+
+        // Form1
+        AutoScaleDimensions = new SizeF(7F, 15F);
+        AutoScaleMode = AutoScaleMode.Font;
+        ClientSize = new Size(800, 450);
+        Controls.Add(splitContainer1);
+        Controls.Add(menuStrip1);
+        MainMenuStrip = menuStrip1;
+        Name = "Form1";
+        Text = "FrameFlow";
+        menuStrip1.ResumeLayout(false);
+        menuStrip1.PerformLayout();
+        splitContainer1.Panel1.ResumeLayout(false);
+        ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
+        splitContainer1.ResumeLayout(false);
+        ResumeLayout(false);
+        PerformLayout();
     }
 
     #endregion
 
-    private System.Windows.Forms.Panel leftPanel;
-    private System.Windows.Forms.Panel centerPanel;
-    private System.Windows.Forms.Panel rightPanel;
-    private System.Windows.Forms.Button importMediaButton;
-    private System.Windows.Forms.ListBox mediaListBox;
-    private System.Windows.Forms.Panel panelTranscriptionProgress;
-    private System.Windows.Forms.Label subjectLabel;
-    private System.Windows.Forms.TextBox subjectTextBox;
-    private System.Windows.Forms.ComboBox durationComboBox;
-    private System.Windows.Forms.ComboBox customDurationComboBox;
-    private System.Windows.Forms.Label lengthLabel;
-    private System.Windows.Forms.Label minLabel;
-    private System.Windows.Forms.Button btnAnalyzeAndEditSrt;
-    private System.Windows.Forms.ProgressBar progressBarAnalysis;
-    private System.Windows.Forms.ToolStrip mainToolStrip;
-    private System.Windows.Forms.ToolStripButton btnNewProject;
-    private System.Windows.Forms.ToolStripButton btnOpenProject;
-    private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
-    private System.Windows.Forms.ToolStripButton btnSettings;
+    // Add these helper methods to Form1:
+    private NumericUpDown CreateWeightInput(string name, int defaultValue)
+    {
+        return new NumericUpDown
+        {
+            Name = $"{name.ToLower()}WeightInput",
+            Minimum = 0,
+            Maximum = 100,
+            Value = defaultValue,
+            DecimalPlaces = 0,
+            Width = 60,
+            Margin = new Padding(0, 0, 10, 0)
+        };
+    }
+
+    private Label CreateWeightLabel(string text)
+    {
+        return new Label
+        {
+            Text = text,
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Margin = new Padding(5, 0, 5, 0),
+            Dock = DockStyle.Fill
+        };
+    }
 }

@@ -7,7 +7,7 @@
                 "log_id": "onnxruntime-genai",
                 "provider_options": []
             },
-            "filename": "phi3-mini-128k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx",
+            "filename": "phi3-mini-128k-instruct-cpu-int4-rtn-block-32.onnx",
             "head_size": 96,
             "hidden_size": 3072,
             "inputs": {

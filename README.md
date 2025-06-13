@@ -1,108 +1,165 @@
 # FrameFlow
 
-FrameFlow is an AI first video editing application that automatically edits .mp4 files to craft the story you describe in the subject. It transcribes speech, analyzes content, and intelligently selects the most relevant segments based on your chosen subject.
+FrameFlow is a professional-grade non-linear video editor powered by AI that helps you create compelling video content from your media library. Using advanced AI models, it analyzes your video content and creates engaging edits based on your prompts.
 
-## How It Works
+## Features
 
-1. **Video Import**
-   - Import one or more .mp4 video files
-   - Videos are prepared for processing in your project directory
-
-2. **Speech Transcription**
-   - Whisper AI model transcribes speech from each video
-   - Creates timestamped SRT files with spoken content
-   - Shows real-time progress for each video being transcribed
-
-3. **Content Analysis**
-   - Phi-3 AI model analyzes each segment of the transcription
-   - Scores segments based on relevance to your chosen subject
-   - Creates `[projectname].edit.srt` with all segments and their scores
-
-4. **Segment Selection**
-   - Selects highest-scoring segments that fit within your time limit
-   - Prioritizes segments with scores >= 50
-   - Creates `[projectname].working.edit.srt` with selected segments in chronological order
-
-5. **Story Ordering**
-   - AI reorders segments to create a coherent narrative
-   - Considers context and flow between segments
-   - Creates `[projectname].working.edit.reorder.srt` with the story-optimized sequence
-
-6. **Video Creation**
-   - FFmpeg extracts selected segments from source videos
-   - Combines segments according to the chosen order
-   - Creates final edited video in your project directory
-
-Each step shows progress in the application's interface, and the final output includes:
-- Original transcription files
-- Scored segment list
-- Chronological edit
-- Story-ordered edit
-- Final edited video
-
-After installing all dependancies open the folder in VS Code
-run commands:
-dotnet restore 
-dotnet build
-dotnet run
+- **AI-Powered Video Editing**: Generate video edits based on natural language prompts
+- **Smart Content Analysis**: Automatic transcription and content analysis of imported media
+- **Flexible Project Management**: Create and manage multiple video editing projects
+- **Customizable Weights**: Fine-tune your edits with adjustable parameters:
+  - Relevance: How closely the content matches your prompt (0-100)
+  - Sentiment: Emotional tone of the content (0-100)
+  - Novelty: How unique or surprising the content is (0-100)
+  - Energy: Energy level and intensity of the content (0-100)
+- **Multi-Format Support**: Import videos in various formats (.mp4, .avi, .mkv, .mov, .wmv, .flv, .webm)
+- **Dark Mode**: Comfortable editing in low-light environments
 
 ## Dependencies
 
 ### Required Software
 
-1. **FFmpeg and Required Libraries**
-   - Download the full FFmpeg package from: [FFmpeg Official Website](https://ffmpeg.org/download.html)
-   - Required files (place all in the same directory): 
-     ffmpeg.exe       # Main FFmpeg executable
-     ffplay.exe       # Media player
-     ffprobe.exe      # Media analyzer
-     avcodec-62.dll   # Codec library
-     avdevice-62.dll  # Device handling
-     avfilter-11.dll  # Audio/video filtering
-     avformat-62.dll  # Container format handling
-     avutil-60.dll    # Common utilities
-     swresample-6.dll # Audio resampling
-     swscale-9.dll    # Video scaling
-   - Place in this location
-     - 'Utilities/ffmpeg' 
+1. **FFmpeg**: Required for video processing
+   - Download from [FFmpeg's official website](https://ffmpeg.org/download.html)
+   - Configure paths in Settings → FFmpeg Settings
 
-2. **NVIDIA CUDA Toolkit** (Optional - for GPU acceleration)
-   - Version: 11.8 or later
-   - Download: [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
-   - Required for GPU-accelerated video processing and AI models
+2. **CUDA and cuDNN**: Required for GPU acceleration
+   - CUDA Toolkit 11.8 or compatible version
+   - cuDNN 8.9.0 or compatible version
+   - Must match the versions supported by the NuGet packages:
+     - Microsoft.ML.OnnxRuntimeGenAI.Cuda (v0.8.2)
+     - Whisper.net.Runtime.Cuda (v1.8.1)
+   - [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/)
+   - [cuDNN Installation Guide](https://docs.nvidia.com/deeplearning/cudnn/install-guide/)
 
-3. **NVIDIA cuDNN** (Optional - for GPU acceleration)
-   - Version: 8.9 or later
-   - Download: [NVIDIA cuDNN](https://developer.nvidia.com/cudnn)
-   - Must match your CUDA version
-   - Required for GPU-accelerated AI models
+3. **NuGet Packages**: Automatically restored on build
+   ```xml
+   <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.Cuda" Version="0.8.2" />
+   <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.DirectML" Version="0.8.2" />
+   <PackageReference Include="Whisper.net" Version="1.8.1" />
+   <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.8.1" />
+   ```
 
-### AI Models
+4. **AI Models**: Required for content analysis
+   - Models can be placed in one of three locations (configurable in Settings → AI Settings):
+     ```
+     %AppData%\FrameFlow\models\cuda     (CUDA-enabled GPUs)
+     %AppData%\FrameFlow\models\directml (DirectML-enabled GPUs)
+     %AppData%\FrameFlow\models\cpu      (CPU-only processing)
+     ```
+   - Required Models:
+     1. **Phi-3 Mini**: Used for content analysis and generation
+        - Download from [microsoft/Phi-3-mini-128k-instruct](https://huggingface.co/microsoft/Phi-3-mini-128k-instruct)
+        - Convert to ONNX format for your compute provider (CUDA/DirectML/CPU)
+        - Place in the corresponding model directory
+     2. **Whisper Base**: Used for audio transcription
+        - Download the GGML base model from [Whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp)
+        - Place `ggml-base.bin` in the `AI Models/Whisper/` directory
+   - The application will automatically use the best available compute provider
+   - Model files are included in `.gitignore` and must be downloaded separately
 
-1. **Phi-3 Model**
-   - https://huggingface.co/microsoft/Phi-3-mini-128k-instruct-onnx
-   - Required for content analysis and scoring
-   - Download options:
-     - CPU version: `phi3-mini-128k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx`
-     - CUDA version: `phi3-mini-128k-instruct-cuda-int4-rtn-block-32.onnx`
-     - DirectML version: `model.onnx`
-   - Place in these locations:
-     - `models/cpu`
-     - `models/cuda`
-     - `models/directml`
+### System Requirements
 
-2. **Whisper Model**
-   - https://huggingface.co/ggerganov/whisper.cpp/tree/main
-   - Required for speech transcription
-   - File: `ggml-base.bin`
-   - Place in this location:
-     - `models/whisper`
+- Windows 10/11 (64-bit)
+- .NET 8.0 Runtime
+- NVIDIA GPU with CUDA support (for GPU acceleration)
+- DirectX 12 capable GPU (for DirectML support)
+- 8GB RAM minimum, 16GB recommended
+- SSD storage recommended for media processing
 
-## Issues
+## Getting Started
 
- **"CUDA initialization failed"**
-   - Update NVIDIA drivers
-   - Verify CUDA Toolkit installation
-   - Check cuDNN installation
-   - make sure CUDA and cuDNN versions are compatible
-   - Try DirectML or CPU version instead
+1. **Environment Setup**:
+   - Install .NET 8.0 Runtime
+   - Install CUDA Toolkit 11.8
+   - Install cuDNN 8.9.0
+   - Verify GPU drivers are up to date
+   - Configure environment variables:
+     - CUDA_PATH
+     - CUDA_PATH_V11_8
+     - Path (include CUDA binary directories)
+
+2. **First Launch**:
+   - Configure FFmpeg paths in Settings
+   - Verify AI model locations
+   - Set your preferred project and import locations
+
+3. **Creating a Project**:
+   - File → New Project
+   - Choose a project location
+   - Projects are saved with the `.ffproj` extension
+
+4. **Importing Media**:
+   - Click "Import Media +" or drag-and-drop files
+   - Supported formats: .mp4, .avi, .mkv, .mov, .wmv, .flv, .webm
+   - Media files are analyzed automatically (configurable in settings)
+
+5. **Generating Edits**:
+   - Enter a prompt describing your desired edit
+   - Adjust weights to fine-tune the result
+   - Set desired output length
+   - Click "Generate" to create your edit
+
+## Project Structure
+
+Projects are organized as follows:
+```
+ProjectName/
+├── project.ffproj       # Project configuration
+├── Media/              # Imported media files
+├── Transcripts/        # Generated transcripts
+├── Thumbnails/        # Media thumbnails
+└── Renders/           # Generated video edits
+```
+
+## Settings
+
+All application settings are configurable through Settings (File → Settings):
+
+- **FFmpeg Settings**: Paths to FFmpeg and FFprobe executables
+- **Project Settings**: Default locations and recent projects
+- **Import Settings**: Auto-analysis, thumbnails, supported formats
+- **UI Settings**: Dark mode, language, thumbnail preferences
+- **AI Settings**: Model paths and compute preferences
+
+## Upcoming Features
+
+1. **Import Queue**:
+   - Background processing for high-volume imports
+   - Progress tracking and notifications
+   - Batch import optimization
+
+2. **Enhanced User Feedback**:
+   - Detailed progress indicators
+   - Time remaining estimates
+   - Resource usage monitoring
+   - Error recovery suggestions
+
+3. **Advanced Analysis**:
+   - Scene detection
+   - Face recognition
+   - Object tracking
+   - Audio analysis
+   - Emotion detection
+
+## Troubleshooting
+
+1. **Model Loading Issues**:
+   - Verify model files exist in the configured directories
+   - Check compute provider compatibility
+   - Review debug output for specific errors
+   - Verify CUDA/cuDNN installation and versions
+   - Check GPU compatibility and drivers
+
+2. **Import Failures**:
+   - Verify FFmpeg installation
+   - Check file permissions
+   - Ensure sufficient disk space
+   - Review supported formats
+
+3. **Generation Issues**:
+   - Check available system resources
+   - Verify media analysis completion
+   - Review prompt guidelines
+   - Monitor GPU memory usage
+   - Check CUDA runtime errors in debug output

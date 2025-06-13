@@ -1,10 +1,10 @@
-bin/
-.vscode/
-models/cpu/*.onnx
-models/cpu/*.data
-models/cuda/*.onnx
-models/cuda/*.data
-models/directml/*.onnx
-models/directml/*.data
-models/whisper/*.bin
-obj/
+/.vscode
+/bin
+/obj
+/AI Models/Whisper/*.bin
+/AI Models/onnx/cpu/*.onnx
+/AI Models/onnx/cpu/*.data
+/AI Models/onnx/cuda/*.onnx
+/AI Models/onnx/cuda/*.data
+/AI Models/onnx/directml/*.onnx
+/AI Models/onnx/directml/*.data
