@@ -57,6 +57,7 @@ namespace FrameFlow.App
         public string ModelPath { get; set; } = string.Empty;
         public float Temperature { get; set; } = 0.7f;
         public int MaxTokens { get; set; } = 2048;
+        public string WhisperModelPath { get; set; } = string.Empty;
   
         // ONNX Model Directories
         public string OnnxCpuModelDirectory { get; set; } = Path.Combine(
@@ -189,6 +190,7 @@ namespace FrameFlow.App
             ModelPath = string.Empty;
             Temperature = 0.7f;
             MaxTokens = 2048;
+            WhisperModelPath = string.Empty;
 
             // ONNX Model Directories - Reset to default paths
             OnnxCpuModelDirectory = Path.Combine(

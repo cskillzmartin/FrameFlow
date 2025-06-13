@@ -17,9 +17,9 @@ namespace FrameFlow.Utilities
         public ImportManager()
         {
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            FFPROBE_PATH = Path.Combine(baseDirectory, "Utilities", "ffmpeg", "ffprobe.exe");
-            FFMPEG_PATH = Path.Combine(baseDirectory, "Utilities", "ffmpeg", "ffmpeg.exe");
-            WHISPER_MODEL_PATH = Path.Combine(baseDirectory, "AI Models", "Whisper", "ggml-base.bin");
+            FFPROBE_PATH = Settings.Instance.FfprobePath;
+            FFMPEG_PATH = Settings.Instance.FfmpegPath;
+            WHISPER_MODEL_PATH = Settings.Instance.WhisperModelPath;
 
             // Verify ffprobe exists
             if (!File.Exists(FFPROBE_PATH))
@@ -76,38 +76,6 @@ namespace FrameFlow.Utilities
 
                 var metadata = MapFfprobeDataToVideoMetadata(ffprobeData);
 
-                // If auto analyze is enabled, extract audio and transcribe
-                if (Settings.Instance.AutoAnalyzeOnImport)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var audioPath = await ExtractAudioAsync(filePath);
-                            await TranscribeAudioToSrtAsync(audioPath);
-                            
-                            // Update the media file info in the project
-                            var fileName = Path.GetFileName(filePath);
-                            var mediaFile = ProjectHandler.Instance.CurrentProject?.MediaFiles.FirstOrDefault(m => m.FileName == fileName);
-                            if (mediaFile != null)
-                            {
-                                mediaFile.HasTranscription = true;
-                                ProjectHandler.Instance.MarkAsModified();
-                                ProjectHandler.Instance.SaveCurrentProject();
-                            }
-
-                            // Clean up the temporary audio file
-                            if (File.Exists(audioPath))
-                                File.Delete(audioPath);
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log the error but don't throw - we don't want to block the metadata return
-                            Console.WriteLine($"Auto transcription failed: {ex.Message}");
-                        }
-                    });
-                }
-
                 return metadata;
             }
             catch (Exception ex)
@@ -116,7 +84,7 @@ namespace FrameFlow.Utilities
             }
         }
 
-        private async Task<string> ExtractAudioAsync(string videoPath)
+        public async Task<string> ExtractAudioAsync(string videoPath)
         {
             var fileName = Path.GetFileNameWithoutExtension(videoPath);
             var audioPath = Path.Combine(GetTranscriptionsDir(), $"{fileName}.wav");
