@@ -236,6 +236,38 @@ namespace FrameFlow.App
             }
         }
 
+       public async Task<string> ExtractAudio(string sourceFilePath)
+       {  
+            var rtnValue = string.Empty;
+            try
+            {
+                rtnValue = await _importManager.ExtractAudioAsync(sourceFilePath);                
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't throw - we don't want to block the metadata return
+                Console.WriteLine($"Auto transcription failed: {ex.Message}");
+            }
+            return rtnValue;
+        }
+        public async Task<bool> TranscribeAudio(string mediafile, string addiofile)
+        {
+                await _importManager.TranscribeAudioToSrtAsync(addiofile);
+
+                // Update the media file info in the project
+                var fileName = Path.GetFileName(mediafile);
+                var mediaFile = ProjectHandler.Instance.CurrentProject?.MediaFiles.FirstOrDefault(m => m.FileName == fileName);
+                if (mediaFile != null)
+                {
+                    mediaFile.HasTranscription = true;
+                    ProjectHandler.Instance.MarkAsModified();
+                    ProjectHandler.Instance.SaveCurrentProject();
+                }
+                // Clean up the temporary audio file
+                if (File.Exists(addiofile))
+                    File.Delete(addiofile);
+                return true;
+        }
         public bool RemoveMediaFromProject(string fileName)
         {
             try

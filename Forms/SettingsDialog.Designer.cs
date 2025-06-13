@@ -475,6 +475,31 @@ namespace FrameFlow.Forms
             const int BUTTON_WIDTH = 75;
             var y = 10;
 
+            // Whisper Model Path
+            var lblWhisperModel = new Label
+            {
+                Text = "Whisper Model:",
+                Location = new Point(0, y + 3),
+                Size = new Size(LABEL_WIDTH, CONTROL_HEIGHT),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            txtWhisperModelPath = new TextBox
+            {
+                Location = new Point(LABEL_WIDTH, y),
+                Size = new Size(TEXT_BOX_WIDTH, CONTROL_HEIGHT)
+            };
+
+            var btnBrowseWhisper = new Button
+            {
+                Text = "Browse",
+                Location = new Point(LABEL_WIDTH + TEXT_BOX_WIDTH + 5, y - 1),
+                Size = new Size(BUTTON_WIDTH, CONTROL_HEIGHT + 2)
+            };
+            btnBrowseWhisper.Click += (s, e) => BrowseForFile(txtWhisperModelPath);
+
+            y += VERTICAL_SPACING;
+
             // CPU Model Path
             var lblCpuModel = new Label
             {
@@ -549,6 +574,7 @@ namespace FrameFlow.Forms
             btnBrowseDirectML.Click += (s, e) => BrowseForFolder(txtDirectMLModelPath);
 
             panel.Controls.AddRange(new Control[] {
+                lblWhisperModel, txtWhisperModelPath, btnBrowseWhisper,
                 lblCpuModel, txtCpuModelPath, btnBrowseCpu,
                 lblCudaModel, txtCudaModelPath, btnBrowseCuda,
                 lblDirectMLModel, txtDirectMLModelPath, btnBrowseDirectML
@@ -585,7 +611,15 @@ namespace FrameFlow.Forms
         {
             using (OpenFileDialog dialog = new OpenFileDialog())
             {
-                dialog.Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*";
+                // Set filter based on which textbox is being used
+                if (textBox == txtWhisperModelPath)
+                {
+                    dialog.Filter = "Whisper model files (*.bin)|*.bin|All files (*.*)|*.*";
+                }
+                else
+                {
+                    dialog.Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*";
+                }
                 dialog.FilterIndex = 1;
 
                 if (!string.IsNullOrEmpty(textBox.Text) && File.Exists(textBox.Text))
@@ -647,5 +681,6 @@ namespace FrameFlow.Forms
         private TextBox txtCpuModelPath;
         private TextBox txtCudaModelPath;
         private TextBox txtDirectMLModelPath;
+        private TextBox txtWhisperModelPath;
     }
 } 

@@ -52,6 +52,8 @@ namespace FrameFlow.Forms
                     txtCudaModelPath.Text = App.Settings.Instance.OnnxCudaModelDirectory;
                 if (txtDirectMLModelPath != null)
                     txtDirectMLModelPath.Text = App.Settings.Instance.OnnxDirectMLModelDirectory;
+                if (txtWhisperModelPath != null)
+                    txtWhisperModelPath.Text = App.Settings.Instance.WhisperModelPath;
             }
             catch (Exception ex)
             {
@@ -96,6 +98,7 @@ namespace FrameFlow.Forms
             App.Settings.Instance.OnnxCpuModelDirectory = txtCpuModelPath.Text;
             App.Settings.Instance.OnnxCudaModelDirectory = txtCudaModelPath.Text;
             App.Settings.Instance.OnnxDirectMLModelDirectory = txtDirectMLModelPath.Text;
+            App.Settings.Instance.WhisperModelPath = txtWhisperModelPath.Text;
 
             App.Settings.Instance.Save();
             DialogResult = DialogResult.OK;
