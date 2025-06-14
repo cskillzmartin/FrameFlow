@@ -350,7 +350,12 @@ Example: '80,-34,4.3,3.2'");
                     Transcript segment:
                     {segmentText}
                     """;
-                _aiManager.UpdateSettings(settings.GenAISettings.Temperature, settings.GenAISettings.TopP, settings.GenAISettings.RepetitionPenalty, null, null, settings.GenAISettings.RandomSeed);
+                _aiManager.UpdateSettings(settings.GenAISettings.Temperature, 
+                                          settings.GenAISettings.TopP, 
+                                          settings.GenAISettings.RepetitionPenalty, 
+                                          null, 
+                                          null, 
+                                          settings.GenAISettings.RandomSeed);
                 var response = await _aiManager.GenerateTextAsync(rankingPrompt, saveHistory: false);
                 
                 // Parse the comma-separated response

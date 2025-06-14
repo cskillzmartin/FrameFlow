@@ -20,7 +20,6 @@ partial class Form1
     private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
     private System.Windows.Forms.Label topLabel;
-    private System.Windows.Forms.Label middleLabel;
     private System.Windows.Forms.ListView mediaListView;
     private System.Windows.Forms.Label promptLabel;
     private System.Windows.Forms.TextBox promptTextBox;
@@ -31,7 +30,6 @@ partial class Form1
     private NumericUpDown sentimentWeightInput;
     private NumericUpDown noveltyWeightInput;
     private NumericUpDown energyWeightInput;
-    private Label weightLabel;
     private TableLayoutPanel weightPanel;
     private ComboBox lengthInput;
     // GenAI controls
