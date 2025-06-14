@@ -44,7 +44,7 @@ namespace FrameFlow.Utilities
         public async Task<List<ClipInfo>> ParseTrimmedSrtFile(string projectName, string renderDir)
         {
             var clips = new List<ClipInfo>();
-            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.ordered.srt");
+            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.expanded.srt");
 
             if (!File.Exists(trimmedFilePath))
             {

@@ -183,8 +183,8 @@ public partial class Form1 : BaseForm
                 {
                     // Step 1: Ranking transcripts
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 1/4: Analyzing transcripts...\r\n");
-                        generateButton.Text = "Analyzing (1/4)";
+                        debugTextBox.AppendText("Step 1/5: Analyzing transcripts...\r\n");
+                        generateButton.Text = "Analyzing (1/5)";
                     });
                     await StoryManager.Instance.RankProjectTranscriptsAsync(
                         App.ProjectHandler.Instance.CurrentProject,
@@ -194,8 +194,8 @@ public partial class Form1 : BaseForm
 
                     // Step 2: Ranking order
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 2/4: Ranking segments...\r\n");
-                        generateButton.Text = "Ranking (2/4)";
+                        debugTextBox.AppendText("Step 2/5: Ranking segments...\r\n");
+                        generateButton.Text = "Ranking (2/5)";
                     });
                     await StoryManager.Instance.RankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -208,10 +208,18 @@ public partial class Form1 : BaseForm
                         renderDir  // Pass the render directory
                     );
 
+                    // step 3.5: temporal expansion
+                    this.Invoke(() => {
+                        debugTextBox.AppendText("Step 3/5: Temporal expansion...\r\n");
+                        generateButton.Text = "Expanding (3/5)";
+                    });
+                    await StoryManager.Instance.TemporalExpansion(
+                        App.ProjectHandler.Instance.CurrentProject.Name, 10, renderDir);   
+
                     // Step 3: Trimming to length
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 3/4: Trimming to length...\r\n");
-                        generateButton.Text = "Trimming (3/4)";
+                        debugTextBox.AppendText("Step 4/5: Trimming to length...\r\n");
+                        generateButton.Text = "Trimming (4/5)";
                     });
                     await StoryManager.Instance.TrimRankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -221,8 +229,8 @@ public partial class Form1 : BaseForm
 
                     // Step 4: Rendering video
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 4/4: Rendering final video...\r\n");
-                        generateButton.Text = "Rendering (4/4)";
+                        debugTextBox.AppendText("Step 5/5: Rendering final video...\r\n");
+                        generateButton.Text = "Rendering (5/5)";
                     });
                     await RenderManager.Instance.RenderVideoAsync(
                         App.ProjectHandler.Instance.CurrentProject.Name,
