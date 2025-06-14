@@ -59,6 +59,7 @@ public partial class Form1 : BaseForm
         weightTooltip.SetToolTip(noveltyWeightInput, "How unique or surprising the content is (0-100)");
         weightTooltip.SetToolTip(energyWeightInput, "Energy level and intensity of the content (0-100)");
         weightTooltip.SetToolTip(lengthInput, "Target length of the final video in minutes");
+        weightTooltip.SetToolTip(temporalExpansionInput, "Base window size in seconds for context expansion (0-60)");
 
         // Set tooltips for GenAI controls
         weightTooltip.SetToolTip(temperatureInput, "Controls randomness in generation (0.0-2.0, higher = more random)");
@@ -155,6 +156,7 @@ public partial class Form1 : BaseForm
             topPInput.Enabled = false;
             repetitionPenaltyInput.Enabled = false;
             randomSeedInput.Enabled = false;
+            temporalExpansionInput.Enabled = false;
 
             //Save the story settings to a file
             var storySettings = new StorySettings();
@@ -164,6 +166,7 @@ public partial class Form1 : BaseForm
             storySettings.Sentiment = (float)sentimentWeightInput.Value;
             storySettings.Novelty = (float)noveltyWeightInput.Value;
             storySettings.Energy = (float)energyWeightInput.Value;
+            storySettings.TemporalExpansion = (int)temporalExpansionInput.Value;
             storySettings.GenAISettings.Temperature = (float)temperatureInput.Value;
             storySettings.GenAISettings.TopP = (float)topPInput.Value;
             storySettings.GenAISettings.RepetitionPenalty = (float)repetitionPenaltyInput.Value;
@@ -214,7 +217,7 @@ public partial class Form1 : BaseForm
                         generateButton.Text = "Expanding (3/5)";
                     });
                     await StoryManager.Instance.TemporalExpansion(
-                        App.ProjectHandler.Instance.CurrentProject.Name, 10, renderDir);   
+                        App.ProjectHandler.Instance.CurrentProject.Name, storySettings.TemporalExpansion, renderDir);   
 
                     // Step 3: Trimming to length
                     this.Invoke(() => {
@@ -272,6 +275,7 @@ public partial class Form1 : BaseForm
             topPInput.Enabled = true;
             repetitionPenaltyInput.Enabled = true;
             randomSeedInput.Enabled = true;
+            temporalExpansionInput.Enabled = true;
         }
     }
 
