@@ -38,6 +38,7 @@ partial class Form1
     private NumericUpDown topPInput;
     private NumericUpDown repetitionPenaltyInput;
     private NumericUpDown randomSeedInput;
+    private NumericUpDown temporalExpansionInput;
 
     /// <summary>
     ///  Clean up any resources being used.
@@ -254,16 +255,16 @@ partial class Form1
         weightPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 5,  // One column per control group
-            RowCount = 4,     // Two rows per group (label + control) * 2 groups
+            ColumnCount = 6,  // Changed from 5 to 6 to add the new control
+            RowCount = 4,     
             Margin = new Padding(0, 10, 0, 10),
             AutoSize = true
         };
 
         // Set column widths to be equal
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)  // Changed from 5 to 6
         {
-            weightPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            weightPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F));  // Changed from 20F to 16.66F
         }
 
         // Set row heights
@@ -297,12 +298,16 @@ partial class Form1
             Margin = new Padding(5)
         };
 
+        // Create temporal expansion control
+        temporalExpansionInput = CreateWeightInput("TemporalExpansion", 10);  // Default value of 10 from StorySettings.cs
+
         // Add first row labels (weights)
         weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);
         weightPanel.Controls.Add(CreateWeightLabel("Sentiment"), 1, 0);
         weightPanel.Controls.Add(CreateWeightLabel("Novelty"), 2, 0);
         weightPanel.Controls.Add(CreateWeightLabel("Energy"), 3, 0);
         weightPanel.Controls.Add(CreateWeightLabel("Length"), 4, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("TempExp"), 5, 0);  // Add new label
 
         // Add first row controls (weights)
         weightPanel.Controls.Add(relevanceWeightInput, 0, 1);
@@ -310,6 +315,7 @@ partial class Form1
         weightPanel.Controls.Add(noveltyWeightInput, 2, 1);
         weightPanel.Controls.Add(energyWeightInput, 3, 1);
         weightPanel.Controls.Add(lengthInput, 4, 1);
+        weightPanel.Controls.Add(temporalExpansionInput, 5, 1);  // Add new control
 
         // Add second row labels (GenAI)
         weightPanel.Controls.Add(CreateWeightLabel("Temperature"), 0, 2);

@@ -59,6 +59,7 @@ public partial class Form1 : BaseForm
         weightTooltip.SetToolTip(noveltyWeightInput, "How unique or surprising the content is (0-100)");
         weightTooltip.SetToolTip(energyWeightInput, "Energy level and intensity of the content (0-100)");
         weightTooltip.SetToolTip(lengthInput, "Target length of the final video in minutes");
+        weightTooltip.SetToolTip(temporalExpansionInput, "Base window size in seconds for context expansion (0-60)");
 
         // Set tooltips for GenAI controls
         weightTooltip.SetToolTip(temperatureInput, "Controls randomness in generation (0.0-2.0, higher = more random)");
@@ -155,6 +156,7 @@ public partial class Form1 : BaseForm
             topPInput.Enabled = false;
             repetitionPenaltyInput.Enabled = false;
             randomSeedInput.Enabled = false;
+            temporalExpansionInput.Enabled = false;
 
             //Save the story settings to a file
             var storySettings = new StorySettings();
@@ -164,6 +166,7 @@ public partial class Form1 : BaseForm
             storySettings.Sentiment = (float)sentimentWeightInput.Value;
             storySettings.Novelty = (float)noveltyWeightInput.Value;
             storySettings.Energy = (float)energyWeightInput.Value;
+            storySettings.TemporalExpansion = (int)temporalExpansionInput.Value;
             storySettings.GenAISettings.Temperature = (float)temperatureInput.Value;
             storySettings.GenAISettings.TopP = (float)topPInput.Value;
             storySettings.GenAISettings.RepetitionPenalty = (float)repetitionPenaltyInput.Value;
@@ -183,8 +186,8 @@ public partial class Form1 : BaseForm
                 {
                     // Step 1: Ranking transcripts
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 1/4: Analyzing transcripts...\r\n");
-                        generateButton.Text = "Analyzing (1/4)";
+                        debugTextBox.AppendText("Step 1/5: Analyzing transcripts...\r\n");
+                        generateButton.Text = "Analyzing (1/5)";
                     });
                     await StoryManager.Instance.RankProjectTranscriptsAsync(
                         App.ProjectHandler.Instance.CurrentProject,
@@ -194,8 +197,8 @@ public partial class Form1 : BaseForm
 
                     // Step 2: Ranking order
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 2/4: Ranking segments...\r\n");
-                        generateButton.Text = "Ranking (2/4)";
+                        debugTextBox.AppendText("Step 2/5: Ranking segments...\r\n");
+                        generateButton.Text = "Ranking (2/5)";
                     });
                     await StoryManager.Instance.RankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -208,10 +211,18 @@ public partial class Form1 : BaseForm
                         renderDir  // Pass the render directory
                     );
 
+                    // step 3.5: temporal expansion
+                    this.Invoke(() => {
+                        debugTextBox.AppendText("Step 3/5: Temporal expansion...\r\n");
+                        generateButton.Text = "Expanding (3/5)";
+                    });
+                    await StoryManager.Instance.TemporalExpansion(
+                        App.ProjectHandler.Instance.CurrentProject.Name, storySettings.TemporalExpansion, renderDir);   
+
                     // Step 3: Trimming to length
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 3/4: Trimming to length...\r\n");
-                        generateButton.Text = "Trimming (3/4)";
+                        debugTextBox.AppendText("Step 4/5: Trimming to length...\r\n");
+                        generateButton.Text = "Trimming (4/5)";
                     });
                     await StoryManager.Instance.TrimRankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -221,8 +232,8 @@ public partial class Form1 : BaseForm
 
                     // Step 4: Rendering video
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 4/4: Rendering final video...\r\n");
-                        generateButton.Text = "Rendering (4/4)";
+                        debugTextBox.AppendText("Step 5/5: Rendering final video...\r\n");
+                        generateButton.Text = "Rendering (5/5)";
                     });
                     await RenderManager.Instance.RenderVideoAsync(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -264,6 +275,7 @@ public partial class Form1 : BaseForm
             topPInput.Enabled = true;
             repetitionPenaltyInput.Enabled = true;
             randomSeedInput.Enabled = true;
+            temporalExpansionInput.Enabled = true;
         }
     }
 

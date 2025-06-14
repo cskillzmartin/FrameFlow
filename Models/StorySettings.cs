@@ -13,6 +13,7 @@ namespace FrameFlow.Models
             Novelty = 25f;
             Energy = 25f;
             Length = 60;  // Default 1 minutes in seconds
+            TemporalExpansion = 2;  // Default 10
             GenAISettings = new GenAISettings();
         }
 
@@ -22,6 +23,7 @@ namespace FrameFlow.Models
         public float Novelty { get; set; }           // Preference for unique/unexpected content (0.0 - 1.0)
         public float Energy { get; set; }            // Pacing and intensity level (0.0 calm to 1.0 energetic)
         public int Length { get; set; }              // Target duration in seconds
+        public int TemporalExpansion { get; set; }   // Temporal expansion factor (0.0 - 10.0)
         public GenAISettings GenAISettings { get; set; } // AI settings for generating the story
     }
 

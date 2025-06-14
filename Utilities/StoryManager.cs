@@ -392,12 +392,12 @@ Example: '80,-34,4.3,3.2'");
 
         public async Task TrimRankOrder(string projectName, int maxLengthSeconds, string renderDir)
         {
-            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.ordered.srt");
-            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.ordered.srt");
+            var expandedFilePath = Path.Combine(renderDir, $"{projectName}.expanded.srt");
+            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.expanded.srt");
 
-            if (!File.Exists(orderedFilePath))
+            if (!File.Exists(expandedFilePath))
             {
-                throw new FileNotFoundException("Ordered segments file not found", orderedFilePath);
+                throw new FileNotFoundException("Expanded segments file not found", expandedFilePath);
             }
 
             var segments = new List<(
@@ -409,7 +409,7 @@ Example: '80,-34,4.3,3.2'");
             )>();
 
             // Read segments from the ordered file (already sorted by score)
-            var lines = await File.ReadAllLinesAsync(orderedFilePath);
+            var lines = await File.ReadAllLinesAsync(expandedFilePath);
             
             for (int i = 0; i < lines.Length;)
             {
@@ -516,5 +516,143 @@ Example: '80,-34,4.3,3.2'");
                 );
             }
         }
+   
+
+        public async Task TemporalExpansion(string projectName, float baseWindowSeconds, string renderDir)
+        {
+            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.ordered.srt");
+            var expandedFilePath = Path.Combine(renderDir, $"{projectName}.expanded.srt");
+
+            if (!File.Exists(orderedFilePath))
+            {
+                throw new FileNotFoundException("Trimmed segments file not found", orderedFilePath);
+            }
+
+            var segments = new List<(
+                string fileName,
+                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
+                TimeSpan start,
+                TimeSpan end,
+                string text
+            )>();
+
+            // Read all segments from the trimmed file
+            var lines = await File.ReadAllLinesAsync(orderedFilePath);
+            
+            // Parse segments using the same pattern as in TrimRankOrder
+            for (int i = 0; i < lines.Length;)
+            {
+                if (string.IsNullOrWhiteSpace(lines[i]))
+                {
+                    i++;
+                    continue;
+                }
+
+                if (int.TryParse(lines[i], out int counter))
+                {
+                    try
+                    {
+                        i++; // Move to timestamp line
+                        if (i >= lines.Length) break;
+                        
+                        var timeParts = lines[i].Split(" --> ");
+                        var start = TimeSpan.Parse(timeParts[0].Replace(',', '.'));
+                        var end = TimeSpan.Parse(timeParts[1].Replace(',', '.'));
+                        
+                        i++; // Move to filename line
+                        var fileName = lines[i];
+                        
+                        i++; // Move to relevance score line
+                        var relevance = float.Parse(lines[i].Split(": ")[1]);
+                        i++; // Move to sentiment score line
+                        var sentiment = float.Parse(lines[i].Split(": ")[1]);
+                        i++; // Move to novelty score line
+                        var novelty = float.Parse(lines[i].Split(": ")[1]);
+                        i++; // Move to energy score line
+                        var energy = float.Parse(lines[i].Split(": ")[1]);
+                        
+                        i++; // Move to text line
+                        var textBuilder = new StringBuilder();
+                        while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]))
+                        {
+                            textBuilder.AppendLine(lines[i]);
+                            i++;
+                        }
+
+                        segments.Add((
+                            fileName,
+                            (relevance, sentiment, novelty, energy),
+                            start,
+                            end,
+                            textBuilder.ToString().Trim()
+                        ));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error parsing segment: {ex.Message}");
+                        i++;
+                    }
+                }
+                else
+                {
+                    i++;
+                }
+            }
+
+            // Process each segment with energy-based temporal expansion
+            var expandedSegments = new List<(
+                string fileName,
+                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
+                TimeSpan start,
+                TimeSpan end,
+                string text
+            )>();
+
+            foreach (var segment in segments)
+            {
+                // Normalize energy score from 0-100 to 0-1
+                float energyNorm = segment.scores.speakerEnergy / 100f;
+                
+                // Calculate dynamic window size using linear interpolation
+                // Lower energy → 0.8 * baseWindow
+                // Higher energy → 1.3 * baseWindow
+                float deltaSeconds = baseWindowSeconds * (0.8f + (energyNorm * 0.5f));
+                
+                // Expand the time window
+                var expandedStart = segment.start - TimeSpan.FromSeconds(deltaSeconds);
+                var expandedEnd = segment.end + TimeSpan.FromSeconds(deltaSeconds);
+                
+                // Ensure we don't go below 0
+                expandedStart = expandedStart < TimeSpan.Zero ? TimeSpan.Zero : expandedStart;
+                
+                expandedSegments.Add((
+                    segment.fileName,
+                    segment.scores,
+                    expandedStart,
+                    expandedEnd,
+                    segment.text
+                ));
+            }
+
+            // Write expanded segments to file
+            await File.WriteAllTextAsync(expandedFilePath, string.Empty);
+            
+            int newCounter = 1;
+            foreach (var segment in expandedSegments)
+            {
+                await AppendSegmentToFileAsync(
+                    expandedFilePath,
+                    (
+                        segment.fileName,
+                        newCounter,
+                        segment.text,
+                        segment.scores,
+                        segment.start,
+                        segment.end
+                    ),
+                    newCounter++
+                );
+            }
+        }   
     }
 } 
