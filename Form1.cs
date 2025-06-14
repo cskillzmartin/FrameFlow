@@ -150,6 +150,10 @@ public partial class Form1 : BaseForm
             noveltyWeightInput.Enabled = false;
             energyWeightInput.Enabled = false;
             btnImportMedia.Enabled = false;
+            temperatureInput.Enabled = false;
+            topPInput.Enabled = false;
+            repetitionPenaltyInput.Enabled = false;
+            randomSeedInput.Enabled = false;
 
             //Save the story settings to a file
             var storySettings = new StorySettings();
@@ -162,7 +166,7 @@ public partial class Form1 : BaseForm
             storySettings.GenAISettings.Temperature = (float)temperatureInput.Value;
             storySettings.GenAISettings.TopP = (float)topPInput.Value;
             storySettings.GenAISettings.RepetitionPenalty = (float)repetitionPenaltyInput.Value;
-            storySettings.GenAISettings.RandomSeed = (int)randomSeedInput.Value;
+            storySettings.GenAISettings.RandomSeed = (long)randomSeedInput.Value;
 
             var storySettingsFile = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath,"Renders" , "story_settings.json");
             File.WriteAllText(storySettingsFile, JsonSerializer.Serialize(storySettings));
@@ -179,7 +183,7 @@ public partial class Form1 : BaseForm
                     });
                     await StoryManager.Instance.RankProjectTranscriptsAsync(
                         App.ProjectHandler.Instance.CurrentProject,
-                        prompt
+                        storySettings
                     );
 
                     // Step 2: Ranking order
@@ -247,6 +251,10 @@ public partial class Form1 : BaseForm
             noveltyWeightInput.Enabled = true;
             energyWeightInput.Enabled = true;
             btnImportMedia.Enabled = true;
+            temperatureInput.Enabled = true;
+            topPInput.Enabled = true;
+            repetitionPenaltyInput.Enabled = true;
+            randomSeedInput.Enabled = true;
         }
     }
 

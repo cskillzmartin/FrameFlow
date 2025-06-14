@@ -30,6 +30,6 @@ namespace FrameFlow.Models
         public float Temperature { get; set; } = 0.7f;
         public float TopP { get; set; } = 0.9f;
         public float RepetitionPenalty { get; set; } = 1.1f;
-        public int? RandomSeed { get; set; } = null;
+        public long? RandomSeed { get; set; } = null;
     }
 } 
