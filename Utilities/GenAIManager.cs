@@ -24,7 +24,7 @@ namespace FrameFlow.Utilities
         public float RepetitionPenalty { get; set; } = 1.1f;
         public int MaxLength { get; set; } = 2048;
         public int MinLength { get; set; } = 8;
-        public int? RandomSeed { get; set; } = null;
+        public long? RandomSeed { get; set; } = null;
         public string SystemPrompt { get; set; } = "You are a helpful AI assistant.";
 
         private GenAIManager()
@@ -99,7 +99,7 @@ namespace FrameFlow.Utilities
         {
             if (_genParams == null) return;
 
-            RandomSeed ??= new Random().Next(int.MaxValue);
+            RandomSeed ??= new Random().NextInt64();
             
             _genParams.SetSearchOption("temperature", Temperature);
             _genParams.SetSearchOption("top_p", TopP);
@@ -187,7 +187,7 @@ namespace FrameFlow.Utilities
             float? repetitionPenalty = null,
             int? maxLength = null,
             int? minLength = null,
-            int? randomSeed = null)
+            long? randomSeed = null)
         {
             if (temperature.HasValue) Temperature = temperature.Value;
             if (topP.HasValue) TopP = topP.Value;

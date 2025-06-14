@@ -34,6 +34,11 @@ partial class Form1
     private Label weightLabel;
     private TableLayoutPanel weightPanel;
     private ComboBox lengthInput;
+    // GenAI controls
+    private NumericUpDown temperatureInput;
+    private NumericUpDown topPInput;
+    private NumericUpDown repetitionPenaltyInput;
+    private NumericUpDown randomSeedInput;
 
     /// <summary>
     ///  Clean up any resources being used.
@@ -243,11 +248,23 @@ partial class Form1
         weightPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 10,
-            RowCount = 2,
+            ColumnCount = 5,  // One column per control group
+            RowCount = 4,     // Two rows per group (label + control) * 2 groups
             Margin = new Padding(0, 10, 0, 10),
             AutoSize = true
         };
+
+        // Set column widths to be equal
+        for (int i = 0; i < 5; i++)
+        {
+            weightPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+        }
+
+        // Set row heights
+        weightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));  // First row labels
+        weightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));  // First row controls
+        weightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));  // Second row labels
+        weightPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));  // Second row controls
 
         // Create weight controls
         relevanceWeightInput = CreateWeightInput("Relevance", 100);
@@ -255,12 +272,21 @@ partial class Form1
         noveltyWeightInput = CreateWeightInput("Novelty", 25);
         energyWeightInput = CreateWeightInput("Energy", 25);
 
+        // Create GenAI controls
+        temperatureInput = CreateGenAIInput("Temperature", 0.7m, 0.0m, 2.0m, 0.1m);
+        topPInput = CreateGenAIInput("TopP", 0.9m, 0.0m, 1.0m, 0.1m);
+        repetitionPenaltyInput = CreateGenAIInput("RepetitionPenalty", 1.1m, 0.0m, 2.0m, 0.1m);
+        randomSeedInput = CreateGenAIInput("RandomSeed", 0m, 0m, 9223372036854775807m, 1m);
+
         // Create length dropdown
         lengthInput = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             Width = 60,
-            Margin = new Padding(0, 0, 10, 0)
+            Margin = new Padding(5),
+            Dock = DockStyle.Fill,
+            FlatStyle = FlatStyle.System,
+            Height = relevanceWeightInput.Height  // Match the height of NumericUpDown controls
         };
         // Populate length dropdown with values 1-100
         for (int i = 1; i <= 100; i++)
@@ -269,19 +295,31 @@ partial class Form1
         }
         lengthInput.SelectedIndex = 0; // Select first item by default
 
-        // Add labels to top row
+        // Add first row labels (weights)
         weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);
-        weightPanel.Controls.Add(CreateWeightLabel("Sentiment"), 2, 0);
-        weightPanel.Controls.Add(CreateWeightLabel("Novelty"), 4, 0);
-        weightPanel.Controls.Add(CreateWeightLabel("Energy"), 6, 0);
-        weightPanel.Controls.Add(CreateWeightLabel("Length"), 8, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Sentiment"), 1, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Novelty"), 2, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Energy"), 3, 0);
+        weightPanel.Controls.Add(CreateWeightLabel("Length"), 4, 0);
 
-        // Add controls to bottom row
+        // Add first row controls (weights)
         weightPanel.Controls.Add(relevanceWeightInput, 0, 1);
-        weightPanel.Controls.Add(sentimentWeightInput, 2, 1);
-        weightPanel.Controls.Add(noveltyWeightInput, 4, 1);
-        weightPanel.Controls.Add(energyWeightInput, 6, 1);
-        weightPanel.Controls.Add(lengthInput, 8, 1);
+        weightPanel.Controls.Add(sentimentWeightInput, 1, 1);
+        weightPanel.Controls.Add(noveltyWeightInput, 2, 1);
+        weightPanel.Controls.Add(energyWeightInput, 3, 1);
+        weightPanel.Controls.Add(lengthInput, 4, 1);
+
+        // Add second row labels (GenAI)
+        weightPanel.Controls.Add(CreateWeightLabel("Temperature"), 0, 2);
+        weightPanel.Controls.Add(CreateWeightLabel("TopP"), 1, 2);
+        weightPanel.Controls.Add(CreateWeightLabel("RepPenalty"), 2, 2);
+        weightPanel.Controls.Add(CreateWeightLabel("RandSeed"), 3, 2);
+
+        // Add second row controls (GenAI)
+        weightPanel.Controls.Add(temperatureInput, 0, 3);
+        weightPanel.Controls.Add(topPInput, 1, 3);
+        weightPanel.Controls.Add(repetitionPenaltyInput, 2, 3);
+        weightPanel.Controls.Add(randomSeedInput, 3, 3);
 
         // Create generate button
         generateButton = new Button
@@ -350,7 +388,8 @@ partial class Form1
             Value = defaultValue,
             DecimalPlaces = 0,
             Width = 60,
-            Margin = new Padding(0, 0, 10, 0)
+            Dock = DockStyle.Fill,
+            Margin = new Padding(5)
         };
     }
 
@@ -360,9 +399,25 @@ partial class Form1
         {
             Text = text,
             AutoSize = true,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Margin = new Padding(5, 0, 5, 0),
-            Dock = DockStyle.Fill
+            TextAlign = ContentAlignment.BottomCenter,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 0, 2)
+        };
+    }
+
+    private NumericUpDown CreateGenAIInput(string name, decimal defaultValue, decimal min, decimal max, decimal increment)
+    {
+        return new NumericUpDown
+        {
+            Name = $"{name.ToLower()}Input",
+            Minimum = min,
+            Maximum = max,
+            Value = defaultValue,
+            DecimalPlaces = 1,
+            Width = 60,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(5),
+            Increment = increment
         };
     }
 }

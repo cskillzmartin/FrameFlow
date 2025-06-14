@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Text;
+using System.Configuration;
 
 namespace FrameFlow.Utilities
 {
@@ -77,9 +78,9 @@ namespace FrameFlow.Utilities
             _aiManager.SystemPrompt = "You are an expert at analyzing video transcripts and rating content relevance. You MUST rate only with a number between 1 and 100. No other text, no explanations, just the number.";
         }
 
-        public async Task RankProjectTranscriptsAsync(ProjectModel project, string prompt)
+        public async Task RankProjectTranscriptsAsync(ProjectModel project, StorySettings settings)
         {
-            if (project == null || string.IsNullOrEmpty(prompt))
+            if (project == null || string.IsNullOrEmpty(settings.Prompt))
                 throw new ArgumentException("Project and prompt are required");
 
             var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
@@ -97,7 +98,7 @@ namespace FrameFlow.Utilities
                 var segments = await ParseSrtFileAsync(srtPath);
                 foreach (var segment in segments)
                 {
-                    var scores = await VectorRankSegmentAsync(segment.text, prompt);
+                    var scores = await VectorRankSegmentAsync(segment.text, settings);
                     
                      // Write this segment immediately to the file
                      await AppendSegmentToFileAsync(
@@ -326,7 +327,7 @@ namespace FrameFlow.Utilities
                     scores.speakerEnergy * weights.Energy) / totalWeight;
         }
 
-        private async Task<(float relevance, float sentiment, float novelty, float speakerEnergy)> VectorRankSegmentAsync(string segmentText, string prompt)
+        private async Task<(float relevance, float sentiment, float novelty, float speakerEnergy)> VectorRankSegmentAsync(string segmentText, StorySettings settings)
         {
             try
             {
@@ -344,12 +345,12 @@ Example: '80,-34,4.3,3.2'");
                 var rankingPrompt = $""" 
                     Analyze this transcript segment across multiple dimensions.
 
-                    Prompt: {prompt}
+                    Prompt: {settings.Prompt}
 
                     Transcript segment:
                     {segmentText}
                     """;
-
+                _aiManager.UpdateSettings(settings.GenAISettings.Temperature, settings.GenAISettings.TopP, settings.GenAISettings.RepetitionPenalty, null, null, settings.GenAISettings.RandomSeed);
                 var response = await _aiManager.GenerateTextAsync(rankingPrompt, saveHistory: false);
                 
                 // Parse the comma-separated response
