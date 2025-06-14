@@ -30,44 +30,6 @@ namespace FrameFlow.Utilities
             }
         }
 
-        public async Task<string> GenerateStoryFromMediaAsync(MediaFileInfo mediaFile)
-        {
-            var prompt = BuildMediaPrompt(mediaFile);
-            return await _aiManager.GenerateTextAsync(prompt, saveHistory: false);
-        }
-
-        public async Task<string> GenerateStoryFromProjectAsync(ProjectModel project)
-        {
-            var prompt = BuildProjectPrompt(project);
-            return await _aiManager.GenerateTextAsync(prompt, saveHistory: false);
-        }
-
-        private string BuildMediaPrompt(MediaFileInfo mediaFile)
-        {
-            return $"""
-                Create a creative description for this video content:
-                Filename: {mediaFile.FileName}
-                Duration: {mediaFile.Duration}
-                Import Date: {mediaFile.ImportDate}
-                Video Details: {mediaFile.VideoMetaData?.ToString() ?? "No metadata available"}
-                """;
-        }
-
-        private string BuildProjectPrompt(ProjectModel project)
-        {
-            return $"""
-                Create a story that connects these video files into a coherent narrative:
-                Project Name: {project.Name}
-                Project Description: {project.Description}
-                Number of Media Files: {project.MediaFiles.Count}
-                Project Created: {project.CreatedDate}
-                Custom Prompt: {project.Prompt}
-
-                Media Files:
-                {string.Join("\n", project.MediaFiles.Select(m => $"- {m.FileName} ({m.Duration})"))}
-                """;
-        }
-
         public void UpdateSystemPrompt(string newPrompt)
         {
             _aiManager.SystemPrompt = newPrompt;
@@ -78,50 +40,8 @@ namespace FrameFlow.Utilities
             _aiManager.SystemPrompt = "You are an expert at analyzing video transcripts and rating content relevance. You MUST rate only with a number between 1 and 100. No other text, no explanations, just the number.";
         }
 
-        public async Task RankProjectTranscriptsAsync(ProjectModel project, StorySettings settings, string renderDir)
+        private async Task AppendSegmentToFileAsync(string filePath, (string fileName, int segmentNumber, string text, (float relevance, float sentiment, float novelty, float speakerEnergy) scores, TimeSpan start, TimeSpan end) segment, int counter)
         {
-            if (project == null || string.IsNullOrEmpty(settings.Prompt))
-                throw new ArgumentException("Project and prompt are required");
-
-            var rankedFilePath = Path.Combine(renderDir, $"{project.Name}.ranked.srt");
-            var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
-            // Create or clear the output file
-            await File.WriteAllTextAsync(rankedFilePath, string.Empty);
-            int segmentCounter = 1;
-
-            foreach (var mediaFile in project.MediaFiles.Where(m => m.HasTranscription))
-            {               
-                var srtPath = Path.Combine(transcriptionDir, $"{Path.GetFileNameWithoutExtension(mediaFile.FileName)}.srt");
-                if (!File.Exists(srtPath)) continue;
-
-                var segments = await ParseSrtFileAsync(srtPath);
-                foreach (var segment in segments)
-                {
-                    var scores = await VectorRankSegmentAsync(segment.text, settings);
-                    
-                     // Write this segment immediately to the file
-                     await AppendSegmentToFileAsync(
-                        rankedFilePath,
-                        (
-                            mediaFile.FileName,
-                            segment.number,
-                            segment.text,
-                            scores,  // Now passing the full vector of scores
-                            segment.start,
-                            segment.end
-                        ),
-                        segmentCounter++
-                    );
-                }
-            }
-        }
-
-        private async Task AppendSegmentToFileAsync(
-            string filePath,
-            (string fileName, int segmentNumber, string text, (float relevance, float sentiment, float novelty, float speakerEnergy) scores, TimeSpan start, TimeSpan end) segment,
-            int counter)
-        {
-            // Use FileMode.Append to add to the existing file
             using var writer = new StreamWriter(filePath, append: true, encoding: Encoding.UTF8);
             
             await writer.WriteLineAsync(counter.ToString());
@@ -184,7 +104,6 @@ namespace FrameFlow.Utilities
             return $"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2},{ts.Milliseconds:D3}";
         }
 
-        // Add a new struct for weights
         public struct RankingWeights
         {
             public float Relevance { get; set; }
@@ -201,7 +120,55 @@ namespace FrameFlow.Utilities
             }
         }
 
-        // Modify RankOrder to accept weights
+        public async Task RankProjectTranscriptsAsync(ProjectModel project, StorySettings settings, string renderDir)
+        {
+            if (project == null || string.IsNullOrEmpty(settings.Prompt))
+                throw new ArgumentException("Project and prompt are required");
+
+            var rankedFilePath = Path.Combine(renderDir, $"{project.Name}.ranked.srt");
+            var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
+            // Create or clear the output file
+            await File.WriteAllTextAsync(rankedFilePath, string.Empty);
+            int segmentCounter = 1;
+
+            foreach (var mediaFile in project.MediaFiles.Where(m => m.HasTranscription))
+            {               
+                var srtPath = Path.Combine(transcriptionDir, $"{Path.GetFileNameWithoutExtension(mediaFile.FileName)}.srt");
+                if (!File.Exists(srtPath)) continue;
+
+                var segments = await ParseSrtFileAsync(srtPath);
+                foreach (var segment in segments)
+                {
+                    var scores = await VectorRankSegmentAsync(segment.text, settings);
+                    
+                     // Write this segment immediately to the file
+                     await AppendSegmentToFileAsync(
+                        rankedFilePath,
+                        (
+                            mediaFile.FileName,
+                            segment.number,
+                            segment.text,
+                            scores,  // Now passing the full vector of scores
+                            segment.start,
+                            segment.end
+                        ),
+                        segmentCounter++
+                    );
+                }
+            }
+        }
+
+        private float CalculateWeightedScore((float relevance, float sentiment, float novelty, float speakerEnergy) scores, RankingWeights weights)
+        {
+            float totalWeight = weights.Relevance + weights.Sentiment + weights.Novelty + weights.Energy;
+            if (totalWeight == 0) return 0;
+
+            return (scores.relevance * weights.Relevance +
+                    scores.sentiment * weights.Sentiment +
+                    scores.novelty * weights.Novelty +
+                    scores.speakerEnergy * weights.Energy) / totalWeight;
+        }
+
         public async Task RankOrder(string projectName, RankingWeights weights, string renderDir)
         {
             var rankedFilePath = Path.Combine(renderDir, $"{projectName}.ranked.srt");
@@ -312,17 +279,152 @@ namespace FrameFlow.Utilities
             }
         }
 
-        private float CalculateWeightedScore(
-            (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
-            RankingWeights weights)
+        public async Task NoveltyReRank(string projectName, float lambda, string renderDir)
         {
-            float totalWeight = weights.Relevance + weights.Sentiment + weights.Novelty + weights.Energy;
-            if (totalWeight == 0) return 0;
+            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.ordered.srt");
+            var noveltyFilePath = Path.Combine(renderDir, $"{projectName}.novelty.srt");
 
-            return (scores.relevance * weights.Relevance +
-                    scores.sentiment * weights.Sentiment +
-                    scores.novelty * weights.Novelty +
-                    scores.speakerEnergy * weights.Energy) / totalWeight;
+            if (!File.Exists(orderedFilePath))
+            {
+                throw new FileNotFoundException("Ordered segments file not found", orderedFilePath);
+            }
+
+            var segments = new List<(
+                string fileName,
+                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
+                TimeSpan start,
+                TimeSpan end,
+                string text
+            )>();
+
+            // Read all segments from the ordered file
+            var lines = await File.ReadAllLinesAsync(orderedFilePath);
+            
+            // Parse segments using the same pattern as before
+            for (int i = 0; i < lines.Length;)
+            {
+                if (string.IsNullOrWhiteSpace(lines[i]))
+                {
+                    i++;
+                    continue;
+                }
+
+                if (int.TryParse(lines[i], out int counter))
+                {
+                    try
+                    {
+                        i++; // Move to timestamp line
+                        if (i >= lines.Length) break;
+                        
+                        var timeParts = lines[i].Split(" --> ");
+                        var start = TimeSpan.Parse(timeParts[0].Replace(',', '.'));
+                        var end = TimeSpan.Parse(timeParts[1].Replace(',', '.'));
+                        
+                        i++; // Move to filename line
+                        var fileName = lines[i];
+                        
+                        i++; // Move to relevance score line
+                        var relevance = float.Parse(lines[i].Split(": ")[1]);
+                        i++; // Move to sentiment score line
+                        var sentiment = float.Parse(lines[i].Split(": ")[1]);
+                        i++; // Move to novelty score line
+                        var novelty = float.Parse(lines[i].Split(": ")[1]);
+                        i++; // Move to energy score line
+                        var energy = float.Parse(lines[i].Split(": ")[1]);
+                        
+                        i++; // Move to text line
+                        var textBuilder = new StringBuilder();
+                        while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]))
+                        {
+                            textBuilder.AppendLine(lines[i]);
+                            i++;
+                        }
+
+                        segments.Add((
+                            fileName,
+                            (relevance, sentiment, novelty, energy),
+                            start,
+                            end,
+                            textBuilder.ToString().Trim()
+                        ));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error parsing segment: {ex.Message}");
+                        i++;
+                    }
+                }
+                else
+                {
+                    i++;
+                }
+            }
+
+            // Apply MMR-style reranking using pre-computed novelty scores
+            var remainingSegments = new List<(
+                string fileName,
+                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
+                TimeSpan start,
+                TimeSpan end,
+                string text
+            )>(segments);
+
+            var rerankedSegments = new List<(
+                string fileName,
+                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
+                TimeSpan start,
+                TimeSpan end,
+                string text
+            )>();
+
+            while (remainingSegments.Count > 0)
+            {
+                // Find segment that maximizes λ·score(c) − (1−λ)·novelty(c)
+                var bestScore = float.MinValue;
+                var bestIndex = -1;
+
+                for (int i = 0; i < remainingSegments.Count; i++)
+                {
+                    var segment = remainingSegments[i];
+                    
+                    // Calculate weighted score using relevance and novelty
+                    var weightedScore = lambda * (segment.scores.relevance / 100f) - 
+                                      (1 - lambda) * (1 - segment.scores.novelty / 100f);
+                    
+                    if (weightedScore > bestScore)
+                    {
+                        bestScore = weightedScore;
+                        bestIndex = i;
+                    }
+                }
+
+                // Add best segment to reranked list and remove from remaining
+                if (bestIndex >= 0)
+                {
+                    rerankedSegments.Add(remainingSegments[bestIndex]);
+                    remainingSegments.RemoveAt(bestIndex);
+                }
+            }
+
+            // Write reranked segments to file
+            await File.WriteAllTextAsync(noveltyFilePath, string.Empty);
+            
+            int newCounter = 1;
+            foreach (var segment in rerankedSegments)
+            {
+                await AppendSegmentToFileAsync(
+                    noveltyFilePath,
+                    (
+                        segment.fileName,
+                        newCounter,
+                        segment.text,
+                        segment.scores,
+                        segment.start,
+                        segment.end
+                    ),
+                    newCounter++
+                );
+            }
         }
 
         private async Task<(float relevance, float sentiment, float novelty, float speakerEnergy)> VectorRankSegmentAsync(string segmentText, StorySettings settings)
@@ -389,134 +491,6 @@ Example: '80,-34,4.3,3.2'");
                 return (0, 50, 0, 0);
             }
         }
-
-        public async Task TrimRankOrder(string projectName, int maxLengthSeconds, string renderDir)
-        {
-            var expandedFilePath = Path.Combine(renderDir, $"{projectName}.expanded.srt");
-            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.srt");
-
-            if (!File.Exists(expandedFilePath))
-            {
-                throw new FileNotFoundException("Expanded segments file not found", expandedFilePath);
-            }
-
-            var segments = new List<(
-                string fileName,
-                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
-                TimeSpan start,
-                TimeSpan end,
-                string text
-            )>();
-
-            // Read segments from the ordered file (already sorted by score)
-            var lines = await File.ReadAllLinesAsync(expandedFilePath);
-            
-            for (int i = 0; i < lines.Length;)
-            {
-                if (string.IsNullOrWhiteSpace(lines[i]))
-                {
-                    i++;
-                    continue;
-                }
-
-                if (int.TryParse(lines[i], out int counter))
-                {
-                    try
-                    {
-                        i++; // Move to timestamp line
-                        if (i >= lines.Length) break;
-                        
-                        var timeParts = lines[i].Split(" --> ");
-                        var start = TimeSpan.Parse(timeParts[0].Replace(',', '.'));
-                        var end = TimeSpan.Parse(timeParts[1].Replace(',', '.'));
-                        
-                        i++; // Move to filename line
-                        var fileName = lines[i];
-                        
-                        i++; // Move to relevance score line
-                        var relevance = float.Parse(lines[i].Split(": ")[1]);
-                        i++; // Move to sentiment score line
-                        var sentiment = float.Parse(lines[i].Split(": ")[1]);
-                        i++; // Move to novelty score line
-                        var novelty = float.Parse(lines[i].Split(": ")[1]);
-                        i++; // Move to energy score line
-                        var energy = float.Parse(lines[i].Split(": ")[1]);
-                        
-                        i++; // Move to text line
-                        var textBuilder = new StringBuilder();
-                        while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]))
-                        {
-                            textBuilder.AppendLine(lines[i]);
-                            i++;
-                        }
-
-                        segments.Add((
-                            fileName,
-                            (relevance, sentiment, novelty, energy),
-                            start,
-                            end,
-                            textBuilder.ToString().Trim()
-                        ));
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error parsing segment: {ex.Message}");
-                        i++;
-                    }
-                }
-                else
-                {
-                    i++;
-                }
-            }
-
-            // Select segments until we reach the time limit
-            var selectedSegments = new List<(
-                string fileName,
-                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
-                TimeSpan start,
-                TimeSpan end,
-                string text
-            )>();
-
-            TimeSpan totalDuration = TimeSpan.Zero;
-            var len = maxLengthSeconds*60;
-            foreach (var segment in segments)
-            {
-                var segmentDuration = segment.end - segment.start;
-                if (totalDuration.TotalSeconds + segmentDuration.TotalSeconds <= len)
-                {
-                    selectedSegments.Add(segment);
-                    totalDuration += segmentDuration;
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            // Create or clear the output file
-            await File.WriteAllTextAsync(trimmedFilePath, string.Empty);
-            
-            // Write selected segments
-            int newCounter = 1;
-            foreach (var segment in selectedSegments)
-            {
-                await AppendSegmentToFileAsync(
-                    trimmedFilePath,
-                    (
-                        segment.fileName,
-                        newCounter,
-                        segment.text,
-                        segment.scores,
-                        segment.start,
-                        segment.end
-                    ),
-                    newCounter++
-                );
-            }
-        }
-   
 
         public async Task TemporalExpansion(string projectName, float baseWindowSeconds, string renderDir)
         {
@@ -654,15 +628,15 @@ Example: '80,-34,4.3,3.2'");
                 );
             }
         }   
-
-        public async Task NoveltyReRank(string projectName, float lambda, string renderDir)
+   
+        public async Task TrimRankOrder(string projectName, int maxLengthSeconds, string renderDir)
         {
-            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.ordered.srt");
-            var noveltyFilePath = Path.Combine(renderDir, $"{projectName}.novelty.srt");
+            var expandedFilePath = Path.Combine(renderDir, $"{projectName}.expanded.srt");
+            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.srt");
 
-            if (!File.Exists(orderedFilePath))
+            if (!File.Exists(expandedFilePath))
             {
-                throw new FileNotFoundException("Ordered segments file not found", orderedFilePath);
+                throw new FileNotFoundException("Expanded segments file not found", expandedFilePath);
             }
 
             var segments = new List<(
@@ -673,10 +647,9 @@ Example: '80,-34,4.3,3.2'");
                 string text
             )>();
 
-            // Read all segments from the ordered file
-            var lines = await File.ReadAllLinesAsync(orderedFilePath);
+            // Read segments from the ordered file (already sorted by score)
+            var lines = await File.ReadAllLinesAsync(expandedFilePath);
             
-            // Parse segments using the same pattern as before
             for (int i = 0; i < lines.Length;)
             {
                 if (string.IsNullOrWhiteSpace(lines[i]))
@@ -736,16 +709,8 @@ Example: '80,-34,4.3,3.2'");
                 }
             }
 
-            // Apply MMR-style reranking using pre-computed novelty scores
-            var remainingSegments = new List<(
-                string fileName,
-                (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
-                TimeSpan start,
-                TimeSpan end,
-                string text
-            )>(segments);
-
-            var rerankedSegments = new List<(
+            // Select segments until we reach the time limit
+            var selectedSegments = new List<(
                 string fileName,
                 (float relevance, float sentiment, float novelty, float speakerEnergy) scores,
                 TimeSpan start,
@@ -753,43 +718,31 @@ Example: '80,-34,4.3,3.2'");
                 string text
             )>();
 
-            while (remainingSegments.Count > 0)
+            TimeSpan totalDuration = TimeSpan.Zero;
+            var len = maxLengthSeconds*60;
+            foreach (var segment in segments)
             {
-                // Find segment that maximizes λ·score(c) − (1−λ)·novelty(c)
-                var bestScore = float.MinValue;
-                var bestIndex = -1;
-
-                for (int i = 0; i < remainingSegments.Count; i++)
+                var segmentDuration = segment.end - segment.start;
+                if (totalDuration.TotalSeconds + segmentDuration.TotalSeconds <= len)
                 {
-                    var segment = remainingSegments[i];
-                    
-                    // Calculate weighted score using relevance and novelty
-                    var weightedScore = lambda * (segment.scores.relevance / 100f) - 
-                                      (1 - lambda) * (1 - segment.scores.novelty / 100f);
-                    
-                    if (weightedScore > bestScore)
-                    {
-                        bestScore = weightedScore;
-                        bestIndex = i;
-                    }
+                    selectedSegments.Add(segment);
+                    totalDuration += segmentDuration;
                 }
-
-                // Add best segment to reranked list and remove from remaining
-                if (bestIndex >= 0)
+                else
                 {
-                    rerankedSegments.Add(remainingSegments[bestIndex]);
-                    remainingSegments.RemoveAt(bestIndex);
+                    break;
                 }
             }
 
-            // Write reranked segments to file
-            await File.WriteAllTextAsync(noveltyFilePath, string.Empty);
+            // Create or clear the output file
+            await File.WriteAllTextAsync(trimmedFilePath, string.Empty);
             
+            // Write selected segments
             int newCounter = 1;
-            foreach (var segment in rerankedSegments)
+            foreach (var segment in selectedSegments)
             {
                 await AppendSegmentToFileAsync(
-                    noveltyFilePath,
+                    trimmedFilePath,
                     (
                         segment.fileName,
                         newCounter,

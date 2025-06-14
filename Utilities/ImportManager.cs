@@ -271,7 +271,86 @@ namespace FrameFlow.Utilities
             return transcriptionsDir;
         }
 
-        // Add methods for handling media import operations
-        
+        public async Task<MediaFileInfo> ImportMediaFileAsync(string sourceFilePath, string projectPath)
+        {
+            if (!File.Exists(sourceFilePath))
+                throw new FileNotFoundException("Source file not found", sourceFilePath);
+
+            // Copy file to project's media directory
+            string targetPath = Path.Combine(projectPath, "media", Path.GetFileName(sourceFilePath));
+            File.Copy(sourceFilePath, targetPath, true);
+
+            // Create media file info
+            var mediaFile = new MediaFileInfo
+            {
+                FileName = Path.GetFileName(sourceFilePath),
+                RelativePath = Path.Combine("media", Path.GetFileName(sourceFilePath)),
+                FileSize = new FileInfo(sourceFilePath).Length,
+                ImportDate = DateTime.Now,
+                FileHash = string.Empty, // TODO: Implement file hash calculation
+                HasThumbnails = false
+            };
+
+            // Extract metadata
+            try
+            {
+                mediaFile.VideoMetaData = ExtractMetaData(targetPath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to extract metadata: {ex.Message}");
+                // Continue even if metadata extraction fails
+            }
+
+            return mediaFile;
+        }
+
+        public void RemoveMediaFile(string projectPath, MediaFileInfo mediaFile)
+        {
+            // Remove the physical file
+            string filePath = Path.Combine(projectPath, mediaFile.RelativePath);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            // Remove transcription file if exists
+            if (mediaFile.HasTranscription)
+            {
+                string transcriptionFile = Path.Combine(
+                    projectPath, 
+                    "Transcriptions", 
+                    $"{Path.GetFileNameWithoutExtension(mediaFile.FileName)}.srt");
+                
+                if (File.Exists(transcriptionFile))
+                {
+                    File.Delete(transcriptionFile);
+                }
+            }
+        }
+
+        public async Task<bool> TranscribeMediaFileAsync(string projectPath, MediaFileInfo mediaFile)
+        {
+            try
+            {
+                string videoPath = Path.Combine(projectPath, mediaFile.RelativePath);
+                string audioPath = await ExtractAudioAsync(videoPath);
+                
+                await TranscribeAudioToSrtAsync(audioPath);
+                
+                // Clean up the temporary audio file
+                if (File.Exists(audioPath))
+                {
+                    File.Delete(audioPath);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to transcribe media file: {ex.Message}");
+                return false;
+            }
+        }        
     }
 } 
