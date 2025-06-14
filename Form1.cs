@@ -15,6 +15,10 @@ public partial class Form1 : BaseForm
     {
         components = new System.ComponentModel.Container();
         InitializeComponent();
+        var rnd = new Random().NextInt64();
+
+        // Set random seed value        
+        randomSeedInput.Value = rnd;
 
         // Subscribe to ProjectHandler events
         App.ProjectHandler.Instance.ProjectOpened += ProjectHandler_ProjectStateChanged;
@@ -54,6 +58,12 @@ public partial class Form1 : BaseForm
         weightTooltip.SetToolTip(noveltyWeightInput, "How unique or surprising the content is (0-100)");
         weightTooltip.SetToolTip(energyWeightInput, "Energy level and intensity of the content (0-100)");
         weightTooltip.SetToolTip(lengthInput, "Target length of the final video in minutes");
+
+        // Set tooltips for GenAI controls
+        weightTooltip.SetToolTip(temperatureInput, "Controls randomness in generation (0.0-2.0, higher = more random)");
+        weightTooltip.SetToolTip(topPInput, "Controls diversity of token selection (0.0-1.0)");
+        weightTooltip.SetToolTip(repetitionPenaltyInput, "Penalizes repetition of tokens (1.0-2.0, higher = less repetition)");
+        weightTooltip.SetToolTip(randomSeedInput, "Seed for reproducible generation (0-999999, 0 = random)");
     }
 
     private async Task LoadModelAsync()
@@ -149,6 +159,10 @@ public partial class Form1 : BaseForm
             storySettings.Sentiment = (float)sentimentWeightInput.Value;
             storySettings.Novelty = (float)noveltyWeightInput.Value;
             storySettings.Energy = (float)energyWeightInput.Value;
+            storySettings.GenAISettings.Temperature = (float)temperatureInput.Value;
+            storySettings.GenAISettings.TopP = (float)topPInput.Value;
+            storySettings.GenAISettings.RepetitionPenalty = (float)repetitionPenaltyInput.Value;
+            storySettings.GenAISettings.RandomSeed = (int)randomSeedInput.Value;
 
             var storySettingsFile = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath,"Renders" , "story_settings.json");
             File.WriteAllText(storySettingsFile, JsonSerializer.Serialize(storySettings));
