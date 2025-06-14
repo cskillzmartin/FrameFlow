@@ -41,11 +41,10 @@ namespace FrameFlow.Utilities
             public float Energy { get; set; }
         }
 
-        public async Task<List<ClipInfo>> ParseTrimmedSrtFile(string projectName)
+        public async Task<List<ClipInfo>> ParseTrimmedSrtFile(string projectName, string renderDir)
         {
             var clips = new List<ClipInfo>();
-            var transcriptionDir = Path.Combine(ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
-            var trimmedFilePath = Path.Combine(transcriptionDir, $"{projectName}.trim.ordered.srt");
+            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.ordered.srt");
 
             if (!File.Exists(trimmedFilePath))
             {
@@ -119,9 +118,9 @@ namespace FrameFlow.Utilities
             return clips;
         }
 
-        public async Task<string> RenderVideoAsync(string projectName, string outputPath)
+        public async Task<string> RenderVideoAsync(string projectName, string outputPath, string renderDir)
         {
-            var clips = await ParseTrimmedSrtFile(projectName);
+            var clips = await ParseTrimmedSrtFile(projectName, renderDir);
             if (!clips.Any())
             {
                 throw new InvalidOperationException("No clips found to render");
@@ -129,7 +128,7 @@ namespace FrameFlow.Utilities
 
             var projectPath = ProjectHandler.Instance.CurrentProjectPath;
             var mediaDir = Path.Combine(projectPath, "media");
-            var tempDir = Path.Combine(projectPath, "temp");
+            var tempDir = Path.Combine(renderDir, "temp");
             Directory.CreateDirectory(tempDir);
 
             try

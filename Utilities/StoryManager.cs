@@ -78,20 +78,19 @@ namespace FrameFlow.Utilities
             _aiManager.SystemPrompt = "You are an expert at analyzing video transcripts and rating content relevance. You MUST rate only with a number between 1 and 100. No other text, no explanations, just the number.";
         }
 
-        public async Task RankProjectTranscriptsAsync(ProjectModel project, StorySettings settings)
+        public async Task RankProjectTranscriptsAsync(ProjectModel project, StorySettings settings, string renderDir)
         {
             if (project == null || string.IsNullOrEmpty(settings.Prompt))
                 throw new ArgumentException("Project and prompt are required");
 
+            var rankedFilePath = Path.Combine(renderDir, $"{project.Name}.ranked.srt");
             var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
-            var rankedFilePath = Path.Combine(transcriptionDir, $"{project.Name}.ranked.srt");
-
             // Create or clear the output file
             await File.WriteAllTextAsync(rankedFilePath, string.Empty);
             int segmentCounter = 1;
 
             foreach (var mediaFile in project.MediaFiles.Where(m => m.HasTranscription))
-            {
+            {               
                 var srtPath = Path.Combine(transcriptionDir, $"{Path.GetFileNameWithoutExtension(mediaFile.FileName)}.srt");
                 if (!File.Exists(srtPath)) continue;
 
@@ -203,11 +202,10 @@ namespace FrameFlow.Utilities
         }
 
         // Modify RankOrder to accept weights
-        public async Task RankOrder(string projectName, RankingWeights weights)
+        public async Task RankOrder(string projectName, RankingWeights weights, string renderDir)
         {
-            var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
-            var rankedFilePath = Path.Combine(transcriptionDir, $"{projectName}.ranked.srt");
-            var orderedFilePath = Path.Combine(transcriptionDir, $"{projectName}.ordered.srt");
+            var rankedFilePath = Path.Combine(renderDir, $"{projectName}.ranked.srt");
+            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.ordered.srt");
 
             if (!File.Exists(rankedFilePath))
             {
@@ -392,11 +390,10 @@ Example: '80,-34,4.3,3.2'");
             }
         }
 
-        public async Task TrimRankOrder(string projectName, int maxLengthSeconds)
+        public async Task TrimRankOrder(string projectName, int maxLengthSeconds, string renderDir)
         {
-            var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
-            var orderedFilePath = Path.Combine(transcriptionDir, $"{projectName}.ordered.srt");
-            var trimmedFilePath = Path.Combine(transcriptionDir, $"{projectName}.trim.ordered.srt");
+            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.ordered.srt");
+            var trimmedFilePath = Path.Combine(renderDir, $"{projectName}.trim.ordered.srt");
 
             if (!File.Exists(orderedFilePath))
             {

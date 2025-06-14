@@ -28,6 +28,7 @@ public partial class Form1 : BaseForm
         newProjectToolStripMenuItem.Click += NewProject_Click;
         openProjectToolStripMenuItem.Click += OpenProject_Click;
         importMediaToolStripMenuItem.Click += ImportMedia_Click;
+        projectToolStripMenuItem.Click += Project_Click;
         btnImportMedia.Click += ImportMedia_Click;
         settingsToolStripMenuItem.Click += Settings_Click;
         exitToolStripMenuItem.Click += Exit_Click;
@@ -138,7 +139,7 @@ public partial class Form1 : BaseForm
                 return;
             }
 
-            var selectedLength = int.Parse(lengthInput.SelectedItem.ToString());
+            var selectedLength = int.Parse(lengthInput.Value.ToString());
             // Disable UI elements
             generateButton.Enabled = false;
             generateButton.ForeColor = Color.White; //keep it readable
@@ -168,7 +169,11 @@ public partial class Form1 : BaseForm
             storySettings.GenAISettings.RepetitionPenalty = (float)repetitionPenaltyInput.Value;
             storySettings.GenAISettings.RandomSeed = (long)randomSeedInput.Value;
 
-            var storySettingsFile = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath,"Renders" , "story_settings.json");
+            // Create new render directory
+            var renderDir = GetNextRenderDirectory();
+            
+            // Save the story settings to the new render directory
+            var storySettingsFile = Path.Combine(renderDir, "story_settings.json");
             File.WriteAllText(storySettingsFile, JsonSerializer.Serialize(storySettings));
             debugTextBox.AppendText($"Story settings saved to {storySettingsFile}\r\n");
 
@@ -183,7 +188,8 @@ public partial class Form1 : BaseForm
                     });
                     await StoryManager.Instance.RankProjectTranscriptsAsync(
                         App.ProjectHandler.Instance.CurrentProject,
-                        storySettings
+                        storySettings,
+                        renderDir  // Pass the render directory
                     );
 
                     // Step 2: Ranking order
@@ -198,7 +204,8 @@ public partial class Form1 : BaseForm
                             (float)sentimentWeightInput.Value,
                             (float)noveltyWeightInput.Value,
                             (float)energyWeightInput.Value
-                        )
+                        ),
+                        renderDir  // Pass the render directory
                     );
 
                     // Step 3: Trimming to length
@@ -208,7 +215,8 @@ public partial class Form1 : BaseForm
                     });
                     await StoryManager.Instance.TrimRankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
-                        selectedLength
+                        selectedLength,
+                        renderDir  // Pass the render directory
                     );
 
                     // Step 4: Rendering video
@@ -218,7 +226,8 @@ public partial class Form1 : BaseForm
                     });
                     await RenderManager.Instance.RenderVideoAsync(
                         App.ProjectHandler.Instance.CurrentProject.Name,
-                        Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Renders", $"{App.ProjectHandler.Instance.CurrentProject.Name}.mp4")
+                        Path.Combine(renderDir, $"{App.ProjectHandler.Instance.CurrentProject.Name}.mp4"),
+                        renderDir  // Pass the render directory
                     );
 
                     this.Invoke(() => {
@@ -555,9 +564,52 @@ public partial class Form1 : BaseForm
         }
     }
 
+    private void Project_Click(object? sender, EventArgs e)
+    {
+        if (!string.IsNullOrEmpty(App.ProjectHandler.Instance.CurrentProjectPath) && 
+            Directory.Exists(App.ProjectHandler.Instance.CurrentProjectPath))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("explorer.exe", App.ProjectHandler.Instance.CurrentProjectPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open project directory: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        else
+        {
+            MessageBox.Show("No project is currently open.", "Information",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+    }
+
     public async Task ReloadModelAsync()
     {
         if (_isModelLoading) return;
         await LoadModelAsync();
+    }
+
+    private string GetNextRenderDirectory()
+    {
+        var rendersPath = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Renders");
+        
+        // Get all existing numbered directories
+        var directories = Directory.GetDirectories(rendersPath)
+            .Select(d => Path.GetFileName(d))
+            .Where(name => int.TryParse(name, out _))
+            .Select(name => int.Parse(name))
+            .ToList();
+        
+        // Get next number (1 if no directories exist)
+        int nextNumber = directories.Any() ? directories.Max() + 1 : 1;
+        
+        // Create the new directory
+        var newRenderDir = Path.Combine(rendersPath, nextNumber.ToString());
+        Directory.CreateDirectory(newRenderDir);
+        
+        return newRenderDir;
     }
 }
