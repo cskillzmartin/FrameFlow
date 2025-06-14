@@ -277,7 +277,8 @@ partial class Form1
         relevanceWeightInput = CreateWeightInput("Relevance", 100);
         sentimentWeightInput = CreateWeightInput("Sentiment", 25);
         noveltyWeightInput = CreateWeightInput("Novelty", 25);
-        energyWeightInput = CreateWeightInput("Energy", 25);
+        energyWeightInput = CreateWeightInput("Energy", 25);        
+        temporalExpansionInput = CreateWeightInput("TemporalExpansion", 5); 
 
         // Create GenAI controls
         temperatureInput = CreateGenAIInput("Temperature", 0.7m, 0.0m, 2.0m, 0.1m);
@@ -298,8 +299,7 @@ partial class Form1
             Margin = new Padding(5)
         };
 
-        // Create temporal expansion control
-        temporalExpansionInput = CreateWeightInput("TemporalExpansion", 10);  // Default value of 10 from StorySettings.cs
+
 
         // Add first row labels (weights)
         weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);
