@@ -169,7 +169,11 @@ public partial class Form1 : BaseForm
             storySettings.GenAISettings.RepetitionPenalty = (float)repetitionPenaltyInput.Value;
             storySettings.GenAISettings.RandomSeed = (long)randomSeedInput.Value;
 
-            var storySettingsFile = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath,"Renders" , "story_settings.json");
+            // Create new render directory
+            var renderDir = GetNextRenderDirectory();
+            
+            // Save the story settings to the new render directory
+            var storySettingsFile = Path.Combine(renderDir, "story_settings.json");
             File.WriteAllText(storySettingsFile, JsonSerializer.Serialize(storySettings));
             debugTextBox.AppendText($"Story settings saved to {storySettingsFile}\r\n");
 
@@ -184,7 +188,8 @@ public partial class Form1 : BaseForm
                     });
                     await StoryManager.Instance.RankProjectTranscriptsAsync(
                         App.ProjectHandler.Instance.CurrentProject,
-                        storySettings
+                        storySettings,
+                        renderDir  // Pass the render directory
                     );
 
                     // Step 2: Ranking order
@@ -199,7 +204,8 @@ public partial class Form1 : BaseForm
                             (float)sentimentWeightInput.Value,
                             (float)noveltyWeightInput.Value,
                             (float)energyWeightInput.Value
-                        )
+                        ),
+                        renderDir  // Pass the render directory
                     );
 
                     // Step 3: Trimming to length
@@ -209,7 +215,8 @@ public partial class Form1 : BaseForm
                     });
                     await StoryManager.Instance.TrimRankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
-                        selectedLength
+                        selectedLength,
+                        renderDir  // Pass the render directory
                     );
 
                     // Step 4: Rendering video
@@ -219,7 +226,8 @@ public partial class Form1 : BaseForm
                     });
                     await RenderManager.Instance.RenderVideoAsync(
                         App.ProjectHandler.Instance.CurrentProject.Name,
-                        Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Renders", $"{App.ProjectHandler.Instance.CurrentProject.Name}.mp4")
+                        Path.Combine(renderDir, $"{App.ProjectHandler.Instance.CurrentProject.Name}.mp4"),
+                        renderDir  // Pass the render directory
                     );
 
                     this.Invoke(() => {
@@ -582,5 +590,26 @@ public partial class Form1 : BaseForm
     {
         if (_isModelLoading) return;
         await LoadModelAsync();
+    }
+
+    private string GetNextRenderDirectory()
+    {
+        var rendersPath = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Renders");
+        
+        // Get all existing numbered directories
+        var directories = Directory.GetDirectories(rendersPath)
+            .Select(d => Path.GetFileName(d))
+            .Where(name => int.TryParse(name, out _))
+            .Select(name => int.Parse(name))
+            .ToList();
+        
+        // Get next number (1 if no directories exist)
+        int nextNumber = directories.Any() ? directories.Max() + 1 : 1;
+        
+        // Create the new directory
+        var newRenderDir = Path.Combine(rendersPath, nextNumber.ToString());
+        Directory.CreateDirectory(newRenderDir);
+        
+        return newRenderDir;
     }
 }
