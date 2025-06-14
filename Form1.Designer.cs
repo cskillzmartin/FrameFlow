@@ -12,6 +12,7 @@ partial class Form1
     private System.Windows.Forms.MenuStrip menuStrip1;
     private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem newProjectToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem projectToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem openProjectToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem importMediaToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem settingsToolStripMenuItem;
@@ -31,7 +32,7 @@ partial class Form1
     private NumericUpDown noveltyWeightInput;
     private NumericUpDown energyWeightInput;
     private TableLayoutPanel weightPanel;
-    private ComboBox lengthInput;
+    private NumericUpDown lengthInput;
     // GenAI controls
     private NumericUpDown temperatureInput;
     private NumericUpDown topPInput;
@@ -62,6 +63,7 @@ partial class Form1
         menuStrip1 = new MenuStrip();
         fileToolStripMenuItem = new ToolStripMenuItem();
         newProjectToolStripMenuItem = new ToolStripMenuItem();
+        projectToolStripMenuItem = new ToolStripMenuItem();
         openProjectToolStripMenuItem = new ToolStripMenuItem();
         importMediaToolStripMenuItem = new ToolStripMenuItem();
         settingsToolStripMenuItem = new ToolStripMenuItem();
@@ -83,6 +85,7 @@ partial class Form1
         // menuStrip1
         menuStrip1.Items.AddRange(new ToolStripItem[] {
             fileToolStripMenuItem,
+            projectToolStripMenuItem,
             helpToolStripMenuItem});
         menuStrip1.Location = new Point(0, 0);
         menuStrip1.Name = "menuStrip1";
@@ -109,6 +112,11 @@ partial class Form1
         newProjectToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.N;
         newProjectToolStripMenuItem.Size = new Size(180, 22);
         newProjectToolStripMenuItem.Text = "&New Project...";
+
+        // projectToolStripMenuItem
+        projectToolStripMenuItem.Name = "projectToolStripMenuItem";
+        projectToolStripMenuItem.Size = new Size(61, 20);
+        projectToolStripMenuItem.Text = "&Project";
 
         // openProjectToolStripMenuItem
         openProjectToolStripMenuItem.Name = "openProjectToolStripMenuItem";
@@ -277,21 +285,17 @@ partial class Form1
         randomSeedInput = CreateGenAIInput("RandomSeed", 0m, 0m, 9223372036854775807m, 1m);
 
         // Create length dropdown
-        lengthInput = new ComboBox
+        lengthInput = new NumericUpDown
         {
-            DropDownStyle = ComboBoxStyle.DropDownList,
+            Name = "lengthInput",
+            Minimum = 1,
+            Maximum = 100,
+            Value = 1,
+            DecimalPlaces = 0,
             Width = 60,
-            Margin = new Padding(5),
             Dock = DockStyle.Fill,
-            FlatStyle = FlatStyle.System,
-            Height = relevanceWeightInput.Height  // Match the height of NumericUpDown controls
+            Margin = new Padding(5)
         };
-        // Populate length dropdown with values 1-100
-        for (int i = 1; i <= 100; i++)
-        {
-            lengthInput.Items.Add(i.ToString());
-        }
-        lengthInput.SelectedIndex = 0; // Select first item by default
 
         // Add first row labels (weights)
         weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);

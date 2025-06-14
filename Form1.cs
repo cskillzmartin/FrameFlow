@@ -28,6 +28,7 @@ public partial class Form1 : BaseForm
         newProjectToolStripMenuItem.Click += NewProject_Click;
         openProjectToolStripMenuItem.Click += OpenProject_Click;
         importMediaToolStripMenuItem.Click += ImportMedia_Click;
+        projectToolStripMenuItem.Click += Project_Click;
         btnImportMedia.Click += ImportMedia_Click;
         settingsToolStripMenuItem.Click += Settings_Click;
         exitToolStripMenuItem.Click += Exit_Click;
@@ -138,7 +139,7 @@ public partial class Form1 : BaseForm
                 return;
             }
 
-            var selectedLength = int.Parse(lengthInput.SelectedItem.ToString());
+            var selectedLength = int.Parse(lengthInput.Value.ToString());
             // Disable UI elements
             generateButton.Enabled = false;
             generateButton.ForeColor = Color.White; //keep it readable
@@ -552,6 +553,28 @@ public partial class Form1 : BaseForm
             {
                 btnImportMedia.Enabled = true;
             }
+        }
+    }
+
+    private void Project_Click(object? sender, EventArgs e)
+    {
+        if (!string.IsNullOrEmpty(App.ProjectHandler.Instance.CurrentProjectPath) && 
+            Directory.Exists(App.ProjectHandler.Instance.CurrentProjectPath))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("explorer.exe", App.ProjectHandler.Instance.CurrentProjectPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open project directory: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        else
+        {
+            MessageBox.Show("No project is currently open.", "Information",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 
