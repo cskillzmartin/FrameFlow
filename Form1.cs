@@ -533,9 +533,13 @@ public partial class Form1 : BaseForm
                         if (App.Settings.Instance.AutoAnalyzeOnImport)
                         {
                             debugTextBox.AppendText($"Extracting audio from {Path.GetFileName(file)}...\r\n");
+                            var audioFile = await App.ProjectHandler.Instance.ExtractAudio(file);
+                            debugTextBox.AppendText($"✓ Successfully extracted audio from {Path.GetFileName(file)}\r\n");
                             debugTextBox.AppendText($"Transcribing audio (this may take a few minutes)...\r\n");
+                            await App.ProjectHandler.Instance.TranscribeAudio(file, audioFile);
+                            debugTextBox.AppendText($"✓ Successfully transcribed {Path.GetFileName(file)}\r\n");
                         }
-                        
+
                         debugTextBox.AppendText($"✓ Successfully imported {Path.GetFileName(file)}\r\n");
                     }   
                 }
