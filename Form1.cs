@@ -186,8 +186,8 @@ public partial class Form1 : BaseForm
                 {
                     // Step 1: Ranking transcripts
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 1/5: Analyzing transcripts...\r\n");
-                        generateButton.Text = "Analyzing (1/5)";
+                        debugTextBox.AppendText("Step 1/6: Analyzing transcripts...\r\n");
+                        generateButton.Text = "Analyzing (1/6)";
                     });
                     await StoryManager.Instance.RankProjectTranscriptsAsync(
                         App.ProjectHandler.Instance.CurrentProject,
@@ -197,8 +197,8 @@ public partial class Form1 : BaseForm
 
                     // Step 2: Ranking order
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 2/5: Ranking segments...\r\n");
-                        generateButton.Text = "Ranking (2/5)";
+                        debugTextBox.AppendText("Step 2/6: Ranking segments...\r\n");
+                        generateButton.Text = "Ranking (2/6)";
                     });
                     await StoryManager.Instance.RankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -211,18 +211,30 @@ public partial class Form1 : BaseForm
                         renderDir  // Pass the render directory
                     );
 
-                    // step 3.5: temporal expansion
+                    // step 3: novelty rerank
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 3/5: Temporal expansion...\r\n");
-                        generateButton.Text = "Expanding (3/5)";
+                        debugTextBox.AppendText("Step 3/6: Novelty rerank...\r\n");
+                        generateButton.Text = "Reranking (3/6)";
+                    });
+                    await StoryManager.Instance.NoveltyReRank(
+                        App.ProjectHandler.Instance.CurrentProject.Name, 
+                        storySettings.Novelty, 
+                        renderDir);
+
+
+                    // step 4: temporal expansion
+                    this.Invoke(() => {
+                        debugTextBox.AppendText("Step 4/6: Temporal expansion...\r\n");
+                        generateButton.Text = "Expanding (4/6)";
                     });
                     await StoryManager.Instance.TemporalExpansion(
                         App.ProjectHandler.Instance.CurrentProject.Name, storySettings.TemporalExpansion, renderDir);   
 
-                    // Step 3: Trimming to length
+                   
+                    // Step 5: Trimming to length
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 4/5: Trimming to length...\r\n");
-                        generateButton.Text = "Trimming (4/5)";
+                        debugTextBox.AppendText("Step 5/6: Trimming to length...\r\n");
+                        generateButton.Text = "Trimming (5/6)";
                     });
                     await StoryManager.Instance.TrimRankOrder(
                         App.ProjectHandler.Instance.CurrentProject.Name,
@@ -230,10 +242,10 @@ public partial class Form1 : BaseForm
                         renderDir  // Pass the render directory
                     );
 
-                    // Step 4: Rendering video
+                    // Step 6: Rendering video
                     this.Invoke(() => {
-                        debugTextBox.AppendText("Step 5/5: Rendering final video...\r\n");
-                        generateButton.Text = "Rendering (5/5)";
+                        debugTextBox.AppendText("Step 6/6: Rendering final video...\r\n");
+                        generateButton.Text = "Rendering (6/6)";
                     });
                     await RenderManager.Instance.RenderVideoAsync(
                         App.ProjectHandler.Instance.CurrentProject.Name,
