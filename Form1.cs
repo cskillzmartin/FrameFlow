@@ -1,5 +1,7 @@
 using FrameFlow.Forms;
 using FrameFlow.Utilities;
+using FrameFlow.Models;
+using System.Text.Json;
 
 namespace FrameFlow;
 
@@ -138,6 +140,19 @@ public partial class Form1 : BaseForm
             noveltyWeightInput.Enabled = false;
             energyWeightInput.Enabled = false;
             btnImportMedia.Enabled = false;
+
+            //Save the story settings to a file
+            var storySettings = new StorySettings();
+            storySettings.Prompt = prompt;
+            storySettings.Length = selectedLength;
+            storySettings.Relevance = (float)relevanceWeightInput.Value;
+            storySettings.Sentiment = (float)sentimentWeightInput.Value;
+            storySettings.Novelty = (float)noveltyWeightInput.Value;
+            storySettings.Energy = (float)energyWeightInput.Value;
+
+            var storySettingsFile = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath,"Renders" , "story_settings.json");
+            File.WriteAllText(storySettingsFile, JsonSerializer.Serialize(storySettings));
+            debugTextBox.AppendText($"Story settings saved to {storySettingsFile}\r\n");
 
             try
             {
