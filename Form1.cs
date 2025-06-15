@@ -449,7 +449,7 @@ public partial class Form1 : BaseForm
     private void About_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(
-            "FrameFlow\nVersion 1.0\n\n© 2024 FrameFlow",
+            "FrameFlow\nVersion 1.0\n\n© " + DateTime.Now.Year + " FrameFlow",
             "About FrameFlow",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
