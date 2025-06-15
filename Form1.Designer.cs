@@ -39,6 +39,7 @@ partial class Form1
     private NumericUpDown repetitionPenaltyInput;
     private NumericUpDown randomSeedInput;
     private NumericUpDown temporalExpansionInput;
+    private Button newSeedButton;
 
     /// <summary>
     ///  Clean up any resources being used.
@@ -299,7 +300,8 @@ partial class Form1
             Margin = new Padding(5)
         };
 
-
+        // Create new seed button
+        newSeedButton = CreateControlButton("New Seed");
 
         // Add first row labels (weights)
         weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);
@@ -328,6 +330,7 @@ partial class Form1
         weightPanel.Controls.Add(topPInput, 1, 3);
         weightPanel.Controls.Add(repetitionPenaltyInput, 2, 3);
         weightPanel.Controls.Add(randomSeedInput, 3, 3);
+        weightPanel.Controls.Add(newSeedButton, 4, 3);
 
         // Create generate button
         generateButton = new Button
@@ -426,6 +429,18 @@ partial class Form1
             Dock = DockStyle.Fill,
             Margin = new Padding(5),
             Increment = increment
+        };
+    }
+
+    private Button CreateControlButton(string text)
+    {
+        return new Button
+        {
+            Text = text,
+            Dock = DockStyle.Fill,
+            BackColor = SystemColors.Control,
+            ForeColor = SystemColors.ControlText,
+            Font = DefaultFont
         };
     }
 }

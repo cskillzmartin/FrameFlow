@@ -15,9 +15,8 @@ public partial class Form1 : BaseForm
     {
         components = new System.ComponentModel.Container();
         InitializeComponent();
+        
         var rnd = new Random().NextInt64();
-
-        // Set random seed value        
         randomSeedInput.Value = rnd;
 
         // Subscribe to ProjectHandler events
@@ -35,6 +34,7 @@ public partial class Form1 : BaseForm
         aboutToolStripMenuItem.Click += About_Click;
         mediaListView.MouseClick += MediaListView_Click;
         generateButton.Click += GenerateButton_Click;
+        newSeedButton.Click += NewSeedButton_Click;
 
         // Enable drag and drop for the ListView
         mediaListView.AllowDrop = true;
@@ -635,5 +635,11 @@ public partial class Form1 : BaseForm
         Directory.CreateDirectory(newRenderDir);
         
         return newRenderDir;
+    }
+
+    private void NewSeedButton_Click(object sender, EventArgs e)
+    {
+        var rnd = new Random().NextInt64();
+        randomSeedInput.Value = rnd;
     }
 }
