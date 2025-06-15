@@ -187,6 +187,14 @@ public partial class Form1 : BaseForm
             {
                 await Task.Run(async () =>
                 {
+                    // Step 0: Analyze takes
+                    this.Invoke(() => {
+                        debugTextBox.AppendText("Step 0/6: Analyzing takes...\r\n");
+                        generateButton.Text = "Analyzing (0/6)";
+                    });
+                    await TakeManager.Instance.ProcessTakeLayerAsync(storySettings, renderDir);
+
+
                     // Step 1: Ranking transcripts
                     this.Invoke(() => {
                         debugTextBox.AppendText("Step 1/6: Analyzing transcripts...\r\n");
