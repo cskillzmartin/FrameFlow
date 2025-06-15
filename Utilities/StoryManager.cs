@@ -126,7 +126,7 @@ namespace FrameFlow.Utilities
                 throw new ArgumentException("Project and prompt are required");
 
             var rankedFilePath = Path.Combine(renderDir, $"{project.Name}.ranked.srt");
-            var transcriptionDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Transcriptions");
+            var transcriptionDir = Path.Combine(renderDir);
             // Create or clear the output file
             await File.WriteAllTextAsync(rankedFilePath, string.Empty);
             int segmentCounter = 1;
