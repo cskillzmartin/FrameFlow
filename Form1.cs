@@ -15,7 +15,7 @@ public partial class Form1 : BaseForm
     {
         components = new System.ComponentModel.Container();
         InitializeComponent();
-        
+
         var rnd = new Random().NextInt64();
         randomSeedInput.Value = rnd;
 
@@ -28,6 +28,7 @@ public partial class Form1 : BaseForm
         openProjectToolStripMenuItem.Click += OpenProject_Click;
         importMediaToolStripMenuItem.Click += ImportMedia_Click;
         projectToolStripMenuItem.Click += Project_Click;
+        loadStorySettingsToolStripMenuItem.Click += LoadStorySettings_Click;
         btnImportMedia.Click += ImportMedia_Click;
         settingsToolStripMenuItem.Click += Settings_Click;
         exitToolStripMenuItem.Click += Exit_Click;
@@ -68,6 +69,7 @@ public partial class Form1 : BaseForm
         weightTooltip.SetToolTip(randomSeedInput, "Seed for reproducible generation (0-999999, 0 = random)");
     }
 
+    // Load the model
     private async Task LoadModelAsync()
     {
         try
@@ -111,6 +113,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Generate a video from the project
     private async void GenerateButton_Click(object? sender, EventArgs e)
     {
         try
@@ -291,12 +294,14 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Update the form title and media list when the project state changes
     private void ProjectHandler_ProjectStateChanged(object? sender, EventArgs e)
     {
         UpdateFormTitle();
         UpdateMediaList();
     }
 
+    // Update the form title
     private void UpdateFormTitle()
     {
         string projectPath = App.ProjectHandler.Instance.CurrentProjectPath;
@@ -305,6 +310,7 @@ public partial class Form1 : BaseForm
             : $"{DEFAULT_TITLE} - {Path.GetFileName(projectPath)}";
     }
 
+    // Create a new project
     private void NewProject_Click(object? sender, EventArgs e)
     {
         using (var folderDialog = new FolderBrowserDialog())
@@ -325,6 +331,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Open a project
     private void OpenProject_Click(object? sender, EventArgs e)
     {
         using (OpenFileDialog openFileDialog = new OpenFileDialog())
@@ -346,6 +353,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Import media files into the project
     private async void ImportMedia_Click(object? sender, EventArgs e)
     {
         // Check if we have an open project
@@ -418,6 +426,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Show the settings dialog
     private void Settings_Click(object? sender, EventArgs e)
     {
         using (var settingsDialog = new SettingsDialog())
@@ -430,11 +439,13 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Exit the application
     private void Exit_Click(object? sender, EventArgs e)
     {
         Close();
     }
 
+    // Show the about dialog
     private void About_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(
@@ -450,6 +461,7 @@ public partial class Form1 : BaseForm
         // For example, saving to the project file or updating other UI elements
     }
 
+    // Update the media list
     private void UpdateMediaList()
     {
         mediaListView.Items.Clear();
@@ -471,10 +483,10 @@ public partial class Form1 : BaseForm
         else
         {
             promptTextBox.Enabled = true;
-            // Here you can load the saved prompt from your project if you have one
         }
     }
 
+    // Delete a media file from the project
     private void MediaListView_Click(object sender, MouseEventArgs e)
     {
         // Get the clicked item
@@ -506,6 +518,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Drag and drop files into the media list
     private void MediaListView_DragEnter(object sender, DragEventArgs e)
     {
         if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
@@ -519,6 +532,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Drag and drop files into the media list
     private async void MediaListView_DragDrop(object sender, DragEventArgs e)
     {
         // Check if we have an open project
@@ -588,6 +602,7 @@ public partial class Form1 : BaseForm
         }
     }
 
+    // Open the project folder
     private void Project_Click(object? sender, EventArgs e)
     {
         if (!string.IsNullOrEmpty(App.ProjectHandler.Instance.CurrentProjectPath) && 
@@ -616,6 +631,7 @@ public partial class Form1 : BaseForm
         await LoadModelAsync();
     }
 
+    // Get the next render directory
     private string GetNextRenderDirectory()
     {
         var rendersPath = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Renders");
@@ -637,9 +653,41 @@ public partial class Form1 : BaseForm
         return newRenderDir;
     }
 
+    // Generate a new random seed
     private void NewSeedButton_Click(object sender, EventArgs e)
     {
         var rnd = new Random().NextInt64();
         randomSeedInput.Value = rnd;
+    }
+
+    // Load story settings into form controls
+    public void LoadStorySettings(StorySettings settings)
+    {
+        promptTextBox.Text = settings.Prompt;
+        lengthInput.Value = settings.Length;
+        relevanceWeightInput.Value = (decimal)settings.Relevance;
+        sentimentWeightInput.Value = (decimal)settings.Sentiment;
+        noveltyWeightInput.Value = (decimal)settings.Novelty;
+        energyWeightInput.Value = (decimal)settings.Energy;
+        temporalExpansionInput.Value = settings.TemporalExpansion;
+        temperatureInput.Value = (decimal)settings.GenAISettings.Temperature;
+        topPInput.Value = (decimal)settings.GenAISettings.TopP;
+        repetitionPenaltyInput.Value = (decimal)settings.GenAISettings.RepetitionPenalty;
+        randomSeedInput.Value = (decimal)(settings.GenAISettings.RandomSeed ?? 0);
+    }
+
+    // Show the story settings viewer
+    private void LoadStorySettings_Click(object? sender, EventArgs e)
+    {
+        // Check if we have an open project
+        if (App.ProjectHandler.Instance.CurrentProject == null)
+        {
+            MessageBox.Show("Please open a project first.", "Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        using var viewer = new StorySettingsViewer(this);
+        viewer.ShowDialog(this);
     }
 }
