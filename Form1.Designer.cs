@@ -18,6 +18,7 @@ partial class Form1
     private System.Windows.Forms.ToolStripMenuItem settingsToolStripMenuItem;
     private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
     private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem loadStorySettingsToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
     private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
     private System.Windows.Forms.Label topLabel;
@@ -39,6 +40,7 @@ partial class Form1
     private NumericUpDown repetitionPenaltyInput;
     private NumericUpDown randomSeedInput;
     private NumericUpDown temporalExpansionInput;
+    private Button newSeedButton;
 
     /// <summary>
     ///  Clean up any resources being used.
@@ -70,6 +72,7 @@ partial class Form1
         settingsToolStripMenuItem = new ToolStripMenuItem();
         toolStripSeparator1 = new ToolStripSeparator();
         exitToolStripMenuItem = new ToolStripMenuItem();
+        loadStorySettingsToolStripMenuItem = new ToolStripMenuItem();
         helpToolStripMenuItem = new ToolStripMenuItem();
         aboutToolStripMenuItem = new ToolStripMenuItem();
         splitContainer1 = new SplitContainer();
@@ -87,6 +90,7 @@ partial class Form1
         menuStrip1.Items.AddRange(new ToolStripItem[] {
             fileToolStripMenuItem,
             projectToolStripMenuItem,
+            loadStorySettingsToolStripMenuItem,
             helpToolStripMenuItem});
         menuStrip1.Location = new Point(0, 0);
         menuStrip1.Name = "menuStrip1";
@@ -117,7 +121,12 @@ partial class Form1
         // projectToolStripMenuItem
         projectToolStripMenuItem.Name = "projectToolStripMenuItem";
         projectToolStripMenuItem.Size = new Size(61, 20);
-        projectToolStripMenuItem.Text = "&Project";
+        projectToolStripMenuItem.Text = "&Project Folder";
+
+        // loadStorySettingsToolStripMenuItem
+        loadStorySettingsToolStripMenuItem.Name = "loadStorySettingsToolStripMenuItem";
+        loadStorySettingsToolStripMenuItem.Size = new Size(108, 20);
+        loadStorySettingsToolStripMenuItem.Text = "&Load Story Settings";
 
         // openProjectToolStripMenuItem
         openProjectToolStripMenuItem.Name = "openProjectToolStripMenuItem";
@@ -299,7 +308,8 @@ partial class Form1
             Margin = new Padding(5)
         };
 
-
+        // Create new seed button
+        newSeedButton = CreateControlButton("New Seed");
 
         // Add first row labels (weights)
         weightPanel.Controls.Add(CreateWeightLabel("Relevance"), 0, 0);
@@ -328,6 +338,7 @@ partial class Form1
         weightPanel.Controls.Add(topPInput, 1, 3);
         weightPanel.Controls.Add(repetitionPenaltyInput, 2, 3);
         weightPanel.Controls.Add(randomSeedInput, 3, 3);
+        weightPanel.Controls.Add(newSeedButton, 4, 3);
 
         // Create generate button
         generateButton = new Button
@@ -426,6 +437,18 @@ partial class Form1
             Dock = DockStyle.Fill,
             Margin = new Padding(5),
             Increment = increment
+        };
+    }
+
+    private Button CreateControlButton(string text)
+    {
+        return new Button
+        {
+            Text = text,
+            Dock = DockStyle.Fill,
+            BackColor = SystemColors.Control,
+            ForeColor = SystemColors.ControlText,
+            Font = DefaultFont
         };
     }
 }

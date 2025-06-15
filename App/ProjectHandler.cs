@@ -191,38 +191,10 @@ namespace FrameFlow.App
                 if (_currentProject == null)
                     throw new InvalidOperationException("No project is currently loaded");
 
-                // Copy file to project's media directory
-                string targetPath = Path.Combine(
-                    CurrentProjectPath,
-                    "media",
-                    Path.GetFileName(sourceFilePath));
-
-                File.Copy(sourceFilePath, targetPath, true);
-
+                // Use ImportManager to handle file operations
+                var mediaFile = await _importManager.ImportMediaFileAsync(sourceFilePath, CurrentProjectPath);
+                
                 // Add to project manifest
-                var mediaFile = new Models.MediaFileInfo
-                {
-                    FileName = Path.GetFileName(sourceFilePath),
-                    RelativePath = Path.Combine("media", Path.GetFileName(sourceFilePath)),
-                    FileSize = new FileInfo(sourceFilePath).Length,
-                    ImportDate = DateTime.Now,
-                    FileHash = string.Empty, // TODO: Implement file hash calculation
-                    HasThumbnails = false
-                };
-
-                // Extract metadata using ImportManager
-                await Task.Run(() => {
-                    try
-                    {
-                        mediaFile.VideoMetaData = _importManager.ExtractMetaData(targetPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Failed to extract metadata: {ex.Message}");
-                        // Continue even if metadata extraction fails
-                    }
-                });
-
                 _currentProject.MediaFiles.Add(mediaFile);
                 SaveProject(CurrentProjectPath);
                 MarkAsModified();
@@ -236,38 +208,37 @@ namespace FrameFlow.App
             }
         }
 
-       public async Task<string> ExtractAudio(string sourceFilePath)
-       {  
-            var rtnValue = string.Empty;
+        public async Task<string> ExtractAudio(string sourceFilePath)
+        {  
+            return await _importManager.ExtractAudioAsync(sourceFilePath);
+        }
+
+        public async Task<bool> TranscribeAudio(string mediafile, string audiofile)
+        {
             try
             {
-                rtnValue = await _importManager.ExtractAudioAsync(sourceFilePath);                
-            }
-            catch (Exception ex)
-            {
-                // Log the error but don't throw - we don't want to block the metadata return
-                Console.WriteLine($"Auto transcription failed: {ex.Message}");
-            }
-            return rtnValue;
-        }
-        public async Task<bool> TranscribeAudio(string mediafile, string addiofile)
-        {
-                await _importManager.TranscribeAudioToSrtAsync(addiofile);
+                await _importManager.TranscribeAudioToSrtAsync(audiofile);
 
                 // Update the media file info in the project
                 var fileName = Path.GetFileName(mediafile);
-                var mediaFile = ProjectHandler.Instance.CurrentProject?.MediaFiles.FirstOrDefault(m => m.FileName == fileName);
+                var mediaFile = _currentProject?.MediaFiles.FirstOrDefault(m => m.FileName == fileName);
                 if (mediaFile != null)
                 {
                     mediaFile.HasTranscription = true;
-                    ProjectHandler.Instance.MarkAsModified();
-                    ProjectHandler.Instance.SaveCurrentProject();
+                    MarkAsModified();
+                    SaveCurrentProject();
                 }
-                // Clean up the temporary audio file
-                if (File.Exists(addiofile))
-                    File.Delete(addiofile);
+
                 return true;
+            }
+            finally
+            {
+                // Clean up the temporary audio file
+                if (File.Exists(audiofile))
+                    File.Delete(audiofile);
+            }
         }
+
         public bool RemoveMediaFromProject(string fileName)
         {
             try
@@ -280,22 +251,8 @@ namespace FrameFlow.App
                 if (mediaFile == null)
                     throw new FileNotFoundException($"Media file '{fileName}' not found in project manifest");
 
-                // Remove the physical file
-                string filePath = Path.Combine(CurrentProjectPath, mediaFile.RelativePath);
-                if (File.Exists(filePath))
-                {
-                    File.Delete(filePath);
-                }
-
-                // Add this section to remove the transcription file
-                if (mediaFile.HasTranscription)
-                {
-                    string transcriptionFile = Path.Combine(CurrentProjectPath, "Transcriptions", $"{Path.GetFileNameWithoutExtension(fileName)}.srt");
-                    if (File.Exists(transcriptionFile))
-                    {
-                        File.Delete(transcriptionFile);
-                    }
-                }
+                // Use ImportManager to handle file operations
+                _importManager.RemoveMediaFile(CurrentProjectPath, mediaFile);
 
                 // Remove from manifest
                 _currentProject.MediaFiles.Remove(mediaFile);
