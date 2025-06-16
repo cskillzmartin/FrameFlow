@@ -28,8 +28,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FaceAiSharp.Bundle" Version="0.5.23" />
     <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.Cuda" Version="0.8.2" />
     <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.DirectML" Version="0.8.2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
     <PackageReference Include="Whisper.net" Version="1.8.1" />
     <PackageReference Include="Whisper.net.Runtime.Cuda" Version="1.8.1" />
   </ItemGroup>
