@@ -85,46 +85,48 @@ namespace FrameFlow.Utilities
                     return false;
                 }
 
-                // Process all SRT files in parallel
-                var processingTasks = srtFiles.Select(async srtFile =>
+                // ================================================
+                // 1) Parse segments for ALL files up-front
+                // ================================================
+                var parseTasks = srtFiles.Select(async srtFile =>
                 {
-                    try
-                    {
-                        var fileName = Path.GetFileName(srtFile);
-                        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(srtFile);
-                        
-                        // Parse segments from this specific file
-                        var segments = await ParseSrtFileAsync(srtFile, fileName);
-                        
-                        if (!segments.Any())
-                        {
-                            System.Diagnostics.Debug.WriteLine($"No segments found in {fileName}. Skipping...");
-                            return true; // Successfully processed (nothing to do)
-                        }
+                    var fileName = Path.GetFileName(srtFile);
+                    var segments = await ParseSrtFileAsync(srtFile, fileName);
+                    return (fileName, segments);
+                });
 
-                        // Detect and select best takes for this file
-                        var canonicalSegments = await DetectAndSelectBestTakesAsync(segments, settings.TakeLayerSettings);
+                var parsedResults = await Task.WhenAll(parseTasks);
 
-                        // Create output file with the same name as source
-                        var outputPath = Path.Combine(renderDir, fileName);
-                        await WriteCanonicalSegmentsAsync(canonicalSegments, outputPath);
+                // Flatten to a master list for cross-file clustering
+                var allSegments = parsedResults.SelectMany(r => r.Item2).ToList();
+                if (!allSegments.Any())
+                {
+                    System.Diagnostics.Debug.WriteLine("No segments found in any SRT file. Nothing to process.");
+                    return true;
+                }
 
-                        System.Diagnostics.Debug.WriteLine($"Take layer processing completed for {fileName}. Output: {outputPath}");
-                        return true; // Successfully processed
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error processing file {Path.GetFileName(srtFile)}: {ex.Message}");
-                        return false; // Failed to process
-                    }
-                }).ToArray();
+                // ================================================
+                // 2) Detect and select best takes ACROSS files
+                // ================================================
+                var canonicalSegments = await DetectAndSelectBestTakesAsync(allSegments, settings.TakeLayerSettings);
 
-                // Wait for all tasks to complete
-                var results = await Task.WhenAll(processingTasks);
-                
-                // Check if all files were processed successfully
-                bool allFilesProcessedSuccessfully = results.All(success => success);
-                return allFilesProcessedSuccessfully;
+                // Group canonical segments by their originating file
+                var segmentsByFile = canonicalSegments.GroupBy(seg => seg.FileName);
+
+                // Ensure output directory exists
+                Directory.CreateDirectory(renderDir);
+
+                // ================================================
+                // 3) Write per-file outputs containing only canonical segments
+                // ================================================
+                foreach (var group in segmentsByFile)
+                {
+                    var outputPath = Path.Combine(renderDir, group.Key);
+                    await WriteCanonicalSegmentsAsync(group.OrderBy(s => s.Start).ToList(), outputPath);
+                    System.Diagnostics.Debug.WriteLine($"Take layer processing completed for {group.Key}. Output: {outputPath}");
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
@@ -265,15 +267,19 @@ namespace FrameFlow.Utilities
                 return text1.Equals(text2, StringComparison.OrdinalIgnoreCase);
             }
 
-            // Calculate Levenshtein distance
+            // Calculate Levenshtein distance and normalise by length
             int levenshteinDistance = CalculateLevenshteinDistance(text1, text2);
-            
+            float maxLen = Math.Max(text1.Length, text2.Length);
+            float normalizedDistance = maxLen == 0 ? 0 : levenshteinDistance / maxLen; // 0-1 range
+
             // Calculate cosine similarity (simplified word-level)
             float cosineSimilarity = CalculateCosineSimilarity(text1, text2);
 
             // Segments are similar if either metric indicates similarity
-            return (levenshteinDistance <= settings.LevenshteinThreshold) || 
-                   (cosineSimilarity >= settings.CosineSimilarityThreshold);
+            bool levenshteinMatch = normalizedDistance <= (settings.LevenshteinThreshold / 100f); // convert percentage threshold
+            bool cosineMatch = cosineSimilarity >= settings.CosineSimilarityThreshold;
+
+            return levenshteinMatch || cosineMatch;
         }
 
         /// <summary>
