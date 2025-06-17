@@ -204,7 +204,6 @@ public partial class Form1 : BaseForm
                         renderDir
                     );
 
-
                     // Step 1: Ranking transcripts
                     this.Invoke(() => {
                         debugTextBox.AppendText("Step 3/9: Analyzing transcripts...\r\n");
