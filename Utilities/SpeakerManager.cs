@@ -370,20 +370,22 @@ namespace FrameFlow.Utilities
                 }
             }
 
-            // Load from the first available SRT file
-            foreach (var srtFile in possibleSrtFiles)
+            // Aggregate segments from ALL available SRT files
+            int totalSegments = 0;
+            foreach (var srtFile in possibleSrtFiles.Distinct())
             {
-                if (File.Exists(srtFile))
+                if (!File.Exists(srtFile)) continue;
+
+                var parsed = await ParseSrtFileAsync(srtFile);
+                if (parsed.Any())
                 {
-                    segments = await ParseSrtFileAsync(srtFile);
-                    if (segments.Any())
-                    {
-                        Debug.WriteLine($"Loaded {segments.Count} segments from {Path.GetFileName(srtFile)}");
-                        break;
-                    }
+                    segments.AddRange(parsed);
+                    totalSegments += parsed.Count;
+                    Debug.WriteLine($"Loaded {parsed.Count} segments from {Path.GetFileName(srtFile)}");
                 }
             }
 
+            Debug.WriteLine($"Total segments loaded across SRT files: {totalSegments}");
             return segments;
         }
 
