@@ -50,7 +50,6 @@ namespace FrameFlow.Utilities
         /// Main entry point for take layer processing
         /// Processes each SRT file individually and creates output files with the same names containing qualified segments
         /// </summary>
-        /// <param name="projectName">Name of the project</param>
         /// <param name="settings">Story settings containing take layer configuration</param>
         /// <param name="renderDir">Directory where output files should be written</param>
         /// <returns>True if processing succeeded, false otherwise</returns>
@@ -86,10 +85,8 @@ namespace FrameFlow.Utilities
                     return false;
                 }
 
-                bool allFilesProcessedSuccessfully = true;
-
-                // Process each SRT file individually
-                foreach (var srtFile in srtFiles)
+                // Process all SRT files in parallel
+                var processingTasks = srtFiles.Select(async srtFile =>
                 {
                     try
                     {
@@ -102,7 +99,7 @@ namespace FrameFlow.Utilities
                         if (!segments.Any())
                         {
                             System.Diagnostics.Debug.WriteLine($"No segments found in {fileName}. Skipping...");
-                            continue;
+                            return true; // Successfully processed (nothing to do)
                         }
 
                         // Detect and select best takes for this file
@@ -113,14 +110,20 @@ namespace FrameFlow.Utilities
                         await WriteCanonicalSegmentsAsync(canonicalSegments, outputPath);
 
                         System.Diagnostics.Debug.WriteLine($"Take layer processing completed for {fileName}. Output: {outputPath}");
+                        return true; // Successfully processed
                     }
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"Error processing file {Path.GetFileName(srtFile)}: {ex.Message}");
-                        allFilesProcessedSuccessfully = false;
+                        return false; // Failed to process
                     }
-                }
+                }).ToArray();
 
+                // Wait for all tasks to complete
+                var results = await Task.WhenAll(processingTasks);
+                
+                // Check if all files were processed successfully
+                bool allFilesProcessedSuccessfully = results.All(success => success);
                 return allFilesProcessedSuccessfully;
             }
             catch (Exception ex)

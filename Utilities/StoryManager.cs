@@ -494,12 +494,12 @@ Example: '80,-34,4.3,3.2'");
 
         public async Task TemporalExpansion(string projectName, float baseWindowSeconds, string renderDir)
         {
-            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.novelty.srt");
+            var orderedFilePath = Path.Combine(renderDir, $"{projectName}.dialogue.srt");
             var expandedFilePath = Path.Combine(renderDir, $"{projectName}.expanded.srt");
 
             if (!File.Exists(orderedFilePath))
             {
-                throw new FileNotFoundException("Trimmed segments file not found", orderedFilePath);
+                throw new FileNotFoundException("Dialogue segments file not found", orderedFilePath);
             }
 
             var segments = new List<(
