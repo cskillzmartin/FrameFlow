@@ -81,16 +81,19 @@ namespace FrameFlow.Utilities
             public List<string> FaceIds { get; set; } = new List<string>();
             public ShotType ShotLabel { get; set; } = ShotType.UNK;
             public float ShotConf { get; set; } = 0.0f;
-            public List<DetectedFace> DetectedFaces { get; set; } = new List<DetectedFace>();
+            public List<string> DetectedFaceIds { get; set; } = new List<string>();
         }
 
         public class DetectedFace
         {
             public string FaceId { get; set; } = string.Empty;
+            [JsonIgnore]
             public float[] Embedding { get; set; } = Array.Empty<float>();
             public float Confidence { get; set; } = 0.0f;
             public FaceRectangle BoundingBox { get; set; } = new FaceRectangle();
             public FacePoint[] Landmarks { get; set; } = Array.Empty<FacePoint>();
+            public string? EmbeddingHash { get; set; }
+            public bool HasEmbedding => !string.IsNullOrEmpty(EmbeddingHash);
         }
 
         // Simple structs to replace ImageSharp types when not available
@@ -121,11 +124,16 @@ namespace FrameFlow.Utilities
         public class SpeakerCluster
         {
             public string ClusterId { get; set; } = string.Empty;
+            [JsonIgnore]
             public List<float> VoiceEmbedding { get; set; } = new List<float>();
+            [JsonIgnore]
             public List<float> FaceEmbedding { get; set; } = new List<float>();
             public int SegmentCount { get; set; } = 0;
             public float Confidence { get; set; } = 0.0f;
             public List<string> LinkedFaceIds { get; set; } = new List<string>();
+            public string? VoiceEmbeddingHash { get; set; }
+            public string? FaceEmbeddingHash { get; set; }
+            public int EmbeddingDimensions { get; set; } = 512;
         }
 
         public class SpeakerMetadata
@@ -137,6 +145,7 @@ namespace FrameFlow.Utilities
             public Dictionary<string, DetectedFace> FaceDatabase { get; set; } = new Dictionary<string, DetectedFace>();
             public SpeakerProcessingSettings Settings { get; set; } = new SpeakerProcessingSettings();
             public bool FaceAiSharpAvailable { get; set; } = false;
+            public EmbeddingCompressionInfo CompressionInfo { get; set; } = new EmbeddingCompressionInfo();
         }
 
         public class SpeakerProcessingSettings
@@ -151,6 +160,21 @@ namespace FrameFlow.Utilities
             public int MaxFacesPerSegment { get; set; } = 5;
         }
 
+        // New: Track compression and file organization
+        public class EmbeddingCompressionInfo
+        {
+            public bool UseExternalEmbeddings { get; set; } = true;
+            public string EmbeddingFileFormat { get; set; } = "binary"; // "binary" or "hdf5"
+            public int TotalFaces { get; set; } = 0;
+            public int TotalClusters { get; set; } = 0;
+            public long OriginalSizeBytes { get; set; } = 0;
+            public long CompressedSizeBytes { get; set; } = 0;
+            public float CompressionRatio => OriginalSizeBytes > 0 ? (float)CompressedSizeBytes / OriginalSizeBytes : 1.0f;
+        }
+
+        // New: In-memory embedding cache
+        private static readonly Dictionary<string, float[]> _embeddingCache = new Dictionary<string, float[]>();
+        private static readonly object _embeddingCacheLock = new object();
 
         /// <summary>
         /// Main entry point for speaker and shot analysis pipeline
@@ -259,7 +283,21 @@ namespace FrameFlow.Utilities
                 }
 
                 var jsonContent = await File.ReadAllTextAsync(cacheFilePath);
-                return JsonSerializer.Deserialize<SpeakerMetadata>(jsonContent);
+                var metadata = JsonSerializer.Deserialize<SpeakerMetadata>(jsonContent);
+                
+                if (metadata == null)
+                {
+                    return null;
+                }
+
+                // Load external embeddings if they exist
+                if (metadata.CompressionInfo.UseExternalEmbeddings)
+                {
+                    await LoadEmbeddingsExternallyAsync(cacheFilePath, metadata);
+                    Debug.WriteLine($"Loaded compressed speaker analysis: {metadata.CompressionInfo.CompressionRatio:P1} compression ratio");
+                }
+
+                return metadata;
             }
             catch (Exception ex)
             {
@@ -667,7 +705,7 @@ namespace FrameFlow.Utilities
                         // Thread-safe update of shared collections
                         lock (lockObject)
                         {
-                            segment.DetectedFaces.AddRange(segmentFaces);
+                            segment.DetectedFaceIds.AddRange(segmentFaces.Select(f => f.FaceId));
                             foreach (var face in segmentFaces)
                             {
                                 metadata.FaceDatabase[face.FaceId] = face;
@@ -798,7 +836,7 @@ namespace FrameFlow.Utilities
                         }
                     };
 
-                    segment.DetectedFaces.Add(detectedFace);
+                    segment.DetectedFaceIds.Add(detectedFace.FaceId);
                     metadata.FaceDatabase[detectedFace.FaceId] = detectedFace;
                     faceIdCounter++;
                 }
@@ -866,8 +904,8 @@ namespace FrameFlow.Utilities
                 {
                     foreach (var segment in segments)
                     {
-                        var detectedFace = segment.DetectedFaces.FirstOrDefault(df => df.FaceId == face.FaceId);
-                        if (detectedFace != null && !segment.FaceIds.Contains(clusterId))
+                        var detectedFace = segment.DetectedFaceIds.FirstOrDefault(df => df == face.FaceId);
+                        if (!string.IsNullOrEmpty(detectedFace) && !segment.FaceIds.Contains(clusterId))
                         {
                             segment.FaceIds.Add(clusterId);
                         }
@@ -964,10 +1002,12 @@ namespace FrameFlow.Utilities
             // Mock shot type assignment based on face detection results
             foreach (var segment in segments)
             {
-                if (segment.DetectedFaces.Any())
+                if (segment.DetectedFaceIds.Any())
                 {
-                    var faceCount = segment.DetectedFaces.Count;
-                    var avgFaceSize = segment.DetectedFaces.Average(f => f.BoundingBox.Width * f.BoundingBox.Height);
+                    var faceCount = segment.DetectedFaceIds.Count;
+                    var avgFaceSize = segment.DetectedFaceIds
+                        .Where(faceId => metadata.FaceDatabase.ContainsKey(faceId))
+                        .Average(faceId => metadata.FaceDatabase[faceId].BoundingBox.Width * metadata.FaceDatabase[faceId].BoundingBox.Height);
                     
                     // Simple heuristic based on face size and count
                     if (faceCount == 1 && avgFaceSize > 10000) // Large single face
@@ -1049,6 +1089,19 @@ namespace FrameFlow.Utilities
         {
             try
             {
+                // Step 1: Save embeddings to external binary file (if enabled)
+                if (metadata.CompressionInfo.UseExternalEmbeddings)
+                {
+                    await SaveEmbeddingsExternallyAsync(cacheFilePath, metadata);
+                }
+
+                // Step 2: Calculate compression stats
+                var originalSize = EstimateOriginalJsonSize(metadata);
+                metadata.CompressionInfo.OriginalSizeBytes = originalSize;
+                metadata.CompressionInfo.TotalFaces = metadata.FaceDatabase.Count;
+                metadata.CompressionInfo.TotalClusters = metadata.Clusters.Count;
+
+                // Step 3: Save compressed JSON (without embeddings)
                 var options = new JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -1058,13 +1111,322 @@ namespace FrameFlow.Utilities
                 var jsonContent = JsonSerializer.Serialize(metadata, options);
                 await File.WriteAllTextAsync(cacheFilePath, jsonContent);
                 
+                var compressedSize = new FileInfo(cacheFilePath).Length;
+                metadata.CompressionInfo.CompressedSizeBytes = compressedSize;
+
                 Debug.WriteLine($"Speaker analysis cache saved to: {Path.GetFileName(cacheFilePath)}");
+                Debug.WriteLine($"Compression ratio: {metadata.CompressionInfo.CompressionRatio:P1} " +
+                               $"({originalSize:N0} → {compressedSize:N0} bytes)");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error saving speaker analysis cache: {ex.Message}");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Save embeddings to external binary file for efficient storage
+        /// </summary>
+        private async Task SaveEmbeddingsExternallyAsync(string cacheFilePath, SpeakerMetadata metadata)
+        {
+            var embeddingFilePath = GetEmbeddingFilePath(cacheFilePath);
+            
+            using var fileStream = new FileStream(embeddingFilePath, FileMode.Create);
+            using var writer = new BinaryWriter(fileStream);
+
+            // Header: version, counts
+            writer.Write((uint)1); // Version
+            writer.Write(metadata.FaceDatabase.Count);
+            writer.Write(metadata.Clusters.Count);
+
+            // Write face embeddings
+            foreach (var kvp in metadata.FaceDatabase)
+            {
+                var face = kvp.Value;
+                writer.Write(face.FaceId);
+                writer.Write(face.Embedding.Length);
+                foreach (var value in face.Embedding)
+                {
+                    writer.Write(value);
+                }
+                
+                // Update hash for verification
+                face.EmbeddingHash = ComputeEmbeddingHash(face.Embedding);
+            }
+
+            // Write cluster embeddings
+            foreach (var cluster in metadata.Clusters)
+            {
+                writer.Write(cluster.ClusterId);
+                
+                // Voice embedding
+                writer.Write(cluster.VoiceEmbedding.Count);
+                foreach (var value in cluster.VoiceEmbedding)
+                {
+                    writer.Write(value);
+                }
+                
+                // Face embedding
+                writer.Write(cluster.FaceEmbedding.Count);
+                foreach (var value in cluster.FaceEmbedding)
+                {
+                    writer.Write(value);
+                }
+
+                // Update hashes
+                cluster.VoiceEmbeddingHash = ComputeEmbeddingHash(cluster.VoiceEmbedding.ToArray());
+                cluster.FaceEmbeddingHash = ComputeEmbeddingHash(cluster.FaceEmbedding.ToArray());
+            }
+
+            Debug.WriteLine($"Embeddings saved to external file: {Path.GetFileName(embeddingFilePath)} " +
+                           $"({new FileInfo(embeddingFilePath).Length:N0} bytes)");
+        }
+
+        /// <summary>
+        /// Load embeddings from external binary file
+        /// </summary>
+        private async Task LoadEmbeddingsExternallyAsync(string cacheFilePath, SpeakerMetadata metadata)
+        {
+            var embeddingFilePath = GetEmbeddingFilePath(cacheFilePath);
+            
+            if (!File.Exists(embeddingFilePath))
+            {
+                Debug.WriteLine("External embedding file not found, embeddings will be empty");
+                return;
+            }
+
+            using var fileStream = new FileStream(embeddingFilePath, FileMode.Open);
+            using var reader = new BinaryReader(fileStream);
+
+            // Read header
+            var version = reader.ReadUInt32();
+            var faceCount = reader.ReadInt32();
+            var clusterCount = reader.ReadInt32();
+
+            // Read face embeddings
+            for (int i = 0; i < faceCount; i++)
+            {
+                var faceId = reader.ReadString();
+                var embeddingLength = reader.ReadInt32();
+                var embedding = new float[embeddingLength];
+                
+                for (int j = 0; j < embeddingLength; j++)
+                {
+                    embedding[j] = reader.ReadSingle();
+                }
+
+                if (metadata.FaceDatabase.ContainsKey(faceId))
+                {
+                    metadata.FaceDatabase[faceId].Embedding = embedding;
+                    
+                    // Cache in memory for faster access
+                    lock (_embeddingCacheLock)
+                    {
+                        _embeddingCache[faceId] = embedding;
+                    }
+                }
+            }
+
+            // Read cluster embeddings
+            for (int i = 0; i < clusterCount; i++)
+            {
+                var clusterId = reader.ReadString();
+                
+                // Voice embedding
+                var voiceLength = reader.ReadInt32();
+                var voiceEmbedding = new List<float>();
+                for (int j = 0; j < voiceLength; j++)
+                {
+                    voiceEmbedding.Add(reader.ReadSingle());
+                }
+
+                // Face embedding
+                var faceLength = reader.ReadInt32();
+                var faceEmbedding = new List<float>();
+                for (int j = 0; j < faceLength; j++)
+                {
+                    faceEmbedding.Add(reader.ReadSingle());
+                }
+
+                var cluster = metadata.Clusters.FirstOrDefault(c => c.ClusterId == clusterId);
+                if (cluster != null)
+                {
+                    cluster.VoiceEmbedding = voiceEmbedding;
+                    cluster.FaceEmbedding = faceEmbedding;
+                }
+            }
+
+            Debug.WriteLine($"Loaded embeddings from external file: {faceCount} faces, {clusterCount} clusters");
+        }
+
+        /// <summary>
+        /// Get face embedding on-demand with caching
+        /// </summary>
+        public float[] GetFaceEmbedding(string faceId)
+        {
+            lock (_embeddingCacheLock)
+            {
+                if (_embeddingCache.ContainsKey(faceId))
+                {
+                    return _embeddingCache[faceId];
+                }
+            }
+
+            // If not in cache, return empty array (embeddings should be loaded via LoadEmbeddingsExternallyAsync)
+            return Array.Empty<float>();
+        }
+
+        /// <summary>
+        /// Convert an existing uncompressed speaker.meta.json file to compressed format
+        /// </summary>
+        public async Task<bool> CompressExistingCacheAsync(string projectName, string renderDir)
+        {
+            try
+            {
+                var cacheFilePath = GetCacheFilePath(renderDir, projectName);
+                if (!File.Exists(cacheFilePath))
+                {
+                    Debug.WriteLine("No existing cache file found to compress");
+                    return false;
+                }
+
+                // Load existing file
+                var jsonContent = await File.ReadAllTextAsync(cacheFilePath);
+                var metadata = JsonSerializer.Deserialize<SpeakerMetadata>(jsonContent);
+                
+                if (metadata == null)
+                {
+                    Debug.WriteLine("Failed to deserialize existing cache file");
+                    return false;
+                }
+
+                // Check if already compressed
+                if (metadata.CompressionInfo.UseExternalEmbeddings)
+                {
+                    Debug.WriteLine("Cache file is already compressed");
+                    return true;
+                }
+
+                // Enable compression
+                metadata.CompressionInfo.UseExternalEmbeddings = true;
+
+                // Create backup of original
+                var backupPath = cacheFilePath + ".backup";
+                File.Copy(cacheFilePath, backupPath, true);
+
+                // Save compressed version
+                await SaveCacheAsync(cacheFilePath, metadata);
+
+                Debug.WriteLine($"Successfully compressed cache file. Backup saved to: {Path.GetFileName(backupPath)}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error compressing existing cache: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Get file size information for the current cache
+        /// </summary>
+        public async Task<CacheFileInfo?> GetCacheFileInfoAsync(string projectName, string renderDir)
+        {
+            try
+            {
+                var cacheFilePath = GetCacheFilePath(renderDir, projectName);
+                var embeddingFilePath = GetEmbeddingFilePath(cacheFilePath);
+
+                if (!File.Exists(cacheFilePath))
+                {
+                    return null;
+                }
+
+                var jsonInfo = new FileInfo(cacheFilePath);
+                var embeddingInfo = File.Exists(embeddingFilePath) ? new FileInfo(embeddingFilePath) : null;
+
+                var metadata = await LoadSpeakerAnalysisAsync(projectName, renderDir);
+                
+                return new CacheFileInfo
+                {
+                    JsonFilePath = cacheFilePath,
+                    JsonFileSize = jsonInfo.Length,
+                    EmbeddingFilePath = embeddingFilePath,
+                    EmbeddingFileSize = embeddingInfo?.Length ?? 0,
+                    TotalSize = jsonInfo.Length + (embeddingInfo?.Length ?? 0),
+                    IsCompressed = metadata?.CompressionInfo.UseExternalEmbeddings ?? false,
+                    CompressionRatio = metadata?.CompressionInfo.CompressionRatio ?? 1.0f,
+                    FaceCount = metadata?.CompressionInfo.TotalFaces ?? 0,
+                    ClusterCount = metadata?.CompressionInfo.TotalClusters ?? 0
+                };
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting cache file info: {ex.Message}");
+                return null;
+            }
+        }
+
+        public class CacheFileInfo
+        {
+            public string JsonFilePath { get; set; } = string.Empty;
+            public long JsonFileSize { get; set; }
+            public string EmbeddingFilePath { get; set; } = string.Empty;
+            public long EmbeddingFileSize { get; set; }
+            public long TotalSize { get; set; }
+            public bool IsCompressed { get; set; }
+            public float CompressionRatio { get; set; }
+            public int FaceCount { get; set; }
+            public int ClusterCount { get; set; }
+            
+            public string GetSizeDescription()
+            {
+                if (IsCompressed)
+                {
+                    return $"JSON: {JsonFileSize:N0} bytes, Embeddings: {EmbeddingFileSize:N0} bytes " +
+                           $"(Total: {TotalSize:N0} bytes, {CompressionRatio:P1} of original)";
+                }
+                else
+                {
+                    return $"Uncompressed: {TotalSize:N0} bytes";
+                }
+            }
+        }
+
+        private string GetEmbeddingFilePath(string cacheFilePath)
+        {
+            return Path.ChangeExtension(cacheFilePath, ".embeddings.bin");
+        }
+
+        private string ComputeEmbeddingHash(float[] embedding)
+        {
+            if (embedding.Length == 0) return string.Empty;
+            
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var bytes = new byte[embedding.Length * sizeof(float)];
+            Buffer.BlockCopy(embedding, 0, bytes, 0, bytes.Length);
+            var hash = sha256.ComputeHash(bytes);
+            return Convert.ToBase64String(hash)[..16]; // First 16 chars for compactness
+        }
+
+        private long EstimateOriginalJsonSize(SpeakerMetadata metadata)
+        {
+            // Rough estimate of JSON size if embeddings were included
+            long embeddingSize = 0;
+            
+            foreach (var face in metadata.FaceDatabase.Values)
+            {
+                embeddingSize += face.Embedding.Length * 8; // ~8 bytes per float in JSON
+            }
+            
+            foreach (var cluster in metadata.Clusters)
+            {
+                embeddingSize += cluster.VoiceEmbedding.Count * 8;
+                embeddingSize += cluster.FaceEmbedding.Count * 8;
+            }
+
+            return embeddingSize;
         }
 
     }
