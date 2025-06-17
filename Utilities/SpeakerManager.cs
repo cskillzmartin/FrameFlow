@@ -547,52 +547,73 @@ namespace FrameFlow.Utilities
             var currentProjectPath = ProjectHandler.Instance.CurrentProjectPath;
             var mediaDir = Path.Combine(currentProjectPath, "media");
 
-            // Use parallel processing for face detection across all segments
-            var parallelOptions = new ParallelOptions
-            {
-                MaxDegreeOfParallelism = Environment.ProcessorCount // Use all available cores
-            };
-
             var faceIdCounter = 1;
             var lockObject = new object();
 
+            // Step 1: Extract all keyframes sequentially to avoid ffmpeg conflicts
+            Debug.WriteLine("Step 1: Extracting keyframes sequentially...");
+            var segmentKeyframes = new List<(SpeakerSegment segment, Image<Rgb24>? keyframe)>();
+            
+            foreach (var segment in segments)
+            {
+                try
+                {
+                    Debug.WriteLine($"Extracting keyframe for segment: {segment.SegmentId}");
+                    
+                    if (string.IsNullOrEmpty(segment.FileName))
+                    {
+                        Debug.WriteLine("❌ No filename for segment");
+                        segmentKeyframes.Add((segment, null));
+                        continue;
+                    }
+
+                    var videoPath = Path.Combine(mediaDir, segment.FileName);
+                    if (!File.Exists(videoPath))
+                    {
+                        Debug.WriteLine($"❌ Video file not found: {segment.FileName}");
+                        segmentKeyframes.Add((segment, null));
+                        continue;
+                    }
+
+                    var keyframeTime = segment.StartTime + TimeSpan.FromMilliseconds((segment.EndTime - segment.StartTime).TotalMilliseconds / 2);
+                    var keyframeImage = ExtractKeyframeSync(videoPath, keyframeTime);
+                    
+                    if (keyframeImage != null)
+                    {
+                        Debug.WriteLine($"✅ Keyframe extracted for {segment.SegmentId}, size: {keyframeImage.Width}x{keyframeImage.Height}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"❌ Failed to extract keyframe for {segment.SegmentId}");
+                    }
+                    
+                    segmentKeyframes.Add((segment, keyframeImage));
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"❌ Error extracting keyframe for {segment.SegmentId}: {ex.Message}");
+                    segmentKeyframes.Add((segment, null));
+                }
+            }
+
+            // Step 2: Process faces in parallel on extracted keyframes
+            Debug.WriteLine("Step 2: Processing faces in parallel...");
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount // Safe to use all cores for face detection
+            };
+
             await Task.Run(() => 
             {
-                Parallel.ForEach(segments, parallelOptions, segment =>
+                Parallel.ForEach(segmentKeyframes.Where(sk => sk.keyframe != null), parallelOptions, segmentKeyframe =>
                 {
+                    var (segment, keyframeImage) = segmentKeyframe;
+                    
                     try
                     {
-                        Debug.WriteLine($"Processing segment: {segment.SegmentId} for file: {segment.FileName}");
-                        
-                        if (string.IsNullOrEmpty(segment.FileName))
-                        {
-                            Debug.WriteLine("❌ No filename for segment");
-                            return;
-                        }
-
-                        var videoPath = Path.Combine(mediaDir, segment.FileName);
-
-                        if (!File.Exists(videoPath))
-                        {
-                            Debug.WriteLine($"❌ Video file not found: {segment.FileName}");
-                            return;
-                        }
-
-                        // Extract keyframe from middle of segment for face analysis
-                        var keyframeTime = segment.StartTime + TimeSpan.FromMilliseconds((segment.EndTime - segment.StartTime).TotalMilliseconds / 2);
-                        
-                        // Synchronous keyframe extraction (ffmpeg handles this efficiently)
-                        var keyframeImage = ExtractKeyframeSync(videoPath, keyframeTime);
-                        
-                        if (keyframeImage == null)
-                        {
-                            Debug.WriteLine($"❌ Failed to extract keyframe for {segment.SegmentId}");
-                            return;
-                        }
-
-                        Debug.WriteLine($"✅ Keyframe extracted for {segment.SegmentId}, size: {keyframeImage.Width}x{keyframeImage.Height}");
+                        Debug.WriteLine($"Processing faces for segment: {segment.SegmentId}");
                       
-                        var detectedFaces = FaceDetector.DetectFaces(keyframeImage);
+                        var detectedFaces = FaceDetector.DetectFaces(keyframeImage!);
                         var segmentFaces = new List<DetectedFace>();
                         
                         foreach (var face in detectedFaces.Take(metadata.Settings.MaxFacesPerSegment))
@@ -603,7 +624,7 @@ namespace FrameFlow.Utilities
                             try
                             {
                                 // Generate face embedding
-                                using var faceImage = keyframeImage.Clone();
+                                using var faceImage = keyframeImage!.Clone();
                                 
                                 // Align face using landmarks if available
                                 if (face.Landmarks != null && face.Landmarks.Any())
@@ -653,22 +674,33 @@ namespace FrameFlow.Utilities
                             }
                         }
 
-                        keyframeImage.Dispose();
                         Debug.WriteLine($"✅ Completed processing {segment.SegmentId} - found {segmentFaces.Count} valid faces");
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"❌ Error processing segment {segment.SegmentId}: {ex.Message}");
+                        Debug.WriteLine($"❌ Error processing faces for segment {segment.SegmentId}: {ex.Message}");
                     }
                 });
             });
+
+            // Step 3: Cleanup keyframe images
+            Debug.WriteLine("Step 3: Cleaning up keyframe images...");
+            foreach (var (_, keyframe) in segmentKeyframes.Where(sk => sk.keyframe != null))
+            {
+                keyframe?.Dispose();
+            }
 
             Debug.WriteLine($"Face detection completed: {metadata.FaceDatabase.Count} faces detected across {segments.Count} segments");
         }
 
         private Image<Rgb24>? ExtractKeyframeSync(string videoPath, TimeSpan timestamp)
         {
-            var tempDir = Path.GetTempPath();
+            var currentProjectPath = ProjectHandler.Instance.CurrentProjectPath;
+            var tempDir = Path.Combine(currentProjectPath, "temp");
+            
+            // Ensure temp directory exists
+            Directory.CreateDirectory(tempDir);
+            
             var tempImagePath = Path.Combine(tempDir, $"keyframe_{Guid.NewGuid():N}.jpg");
 
             try
@@ -676,9 +708,7 @@ namespace FrameFlow.Utilities
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = App.Settings.Instance.FfmpegPath,
-                    Arguments = $"-ss {timestamp:hh\\:mm\\:ss\\.fff} -i \"{videoPath}\" -vframes 1 -q:v 2 -y \"{tempImagePath}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
+                    Arguments = $"-ss {timestamp:hh\\:mm\\:ss\\.fff} -i \"{videoPath}\" -vframes 1 -update 1 -q:v 2 -y \"{tempImagePath}\"",
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -686,12 +716,39 @@ namespace FrameFlow.Utilities
                 using var process = Process.Start(startInfo);
                 if (process == null) return null;
 
-                process.WaitForExit(10000); // 10 second timeout
-
-                if (process.ExitCode != 0 || !File.Exists(tempImagePath))
+                // Wait for process to complete naturally (with a reasonable timeout)
+                bool completed = process.WaitForExit(10000); // 10 second timeout
+                
+                if (!completed)
                 {
+                    Debug.WriteLine("⚠️ FFmpeg timed out, killing process");
+                    try
+                    {
+                        process.Kill();
+                        process.WaitForExit(1000); // Wait for kill to complete
+                    }
+                    catch { }
+                }
+                else
+                {
+                    Debug.WriteLine($"✅ FFmpeg completed with exit code: {process.ExitCode}");
+                }
+
+                if (!File.Exists(tempImagePath))
+                {
+                    Debug.WriteLine($"❌ Keyframe file not created: {tempImagePath}");
                     return null;
                 }
+
+                // Verify file has content
+                var fileInfo = new FileInfo(tempImagePath);
+                if (fileInfo.Length == 0)
+                {
+                    Debug.WriteLine($"❌ Keyframe file is empty");
+                    return null;
+                }
+
+                Debug.WriteLine($"✅ Keyframe ready: {fileInfo.Length} bytes");
 
                 var image = SixLabors.ImageSharp.Image.Load<Rgb24>(tempImagePath);
                 return image;
