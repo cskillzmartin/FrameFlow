@@ -164,8 +164,8 @@ All application settings are configurable through Settings (File → Settings):
    - Monitor GPU memory usage
    - Check CUDA runtime errors in debug output
 
-
 ## 🗺️ Processing Pipeline Overview
+```text
 (raw media)
    │
    ▼
