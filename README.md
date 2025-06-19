@@ -181,8 +181,7 @@ All application settings are configurable through Settings (File → Settings):
    │
    ▼
 ┌─────────────────────┐
-│ 3. Take Layer       │  → detect repeated reads, pick best-take
-│                     │    
+│ 3. Take Layer       │  → detect repeated reads, pick best-take    
 └─────────────────────┘
    │
    ▼
@@ -208,8 +207,7 @@ All application settings are configurable through Settings (File → Settings):
    │
    ▼
 ┌────────────────────────────┐
-│ 8. Dialogue Sequencer      │  → alternate speakers, reply matching,
-│                            │    
+│ 8. Dialogue Sequencer      │  → alternate speakers, reply matching,    
 └────────────────────────────┘
    │
    ▼
