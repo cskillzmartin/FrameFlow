@@ -164,8 +164,8 @@ All application settings are configurable through Settings (File → Settings):
    - Monitor GPU memory usage
    - Check CUDA runtime errors in debug output
 
-## 🗺️ Processing Pipeline Overview
-```text
+# FrameFlow Updated Workflow - Quality Scoring Integration
+```
 (raw media)
    │
    ▼
@@ -180,48 +180,120 @@ All application settings are configurable through Settings (File → Settings):
 └─────────────────────┘
    │
    ▼
-┌─────────────────────┐
-│ 3. Take Layer       │  → detect repeated reads, pick best-take    
-└─────────────────────┘
+┌──────────────────────────────────────┐
+│ 3. Take Layer + Quality Vector       │  → QualityScorer: 9-dimensional assessment
+│                                      │    • Relevance 0-100 (LLM)
+│                                      │    • Sentiment 0-100 (LLM) 
+│                                      │    • Novelty 0-100 (LLM)
+│                                      │    • Energy 0-100 (LLM)
+│                                      │    • Focus 75 (placeholder)
+│                                      │    • Clarity 80 (placeholder)
+│                                      │    • Emotion 70 (placeholder)
+│                                      │    • FlubScore 0-100 (traditional)
+│                                      │    • CompositeScore (weighted)
+│                                      │    
+│                                      │    Detect repeated takes, cluster similar
+│                                      │    segments, select best take per cluster
+│                                      │    Output: Enhanced SRT with all metrics
+└──────────────────────────────────────┘
    │
    ▼
 ┌────────────────────────────┐
-│ 4. Speaker / Shot Tagging  │  → `speakerId`, `shotLabel`, `faceIds`
+│ 4. Speaker / Shot Tagging  │  → Text-based speaker diarization
+│                            │    Face detection & clustering (FaceAiSharp)
+│                            │    Shot classification (CU/MS/WS/INSERT)
+│                            │    Output: speaker.meta.json
+│                            │    `speakerId`, `shotLabel`, `faceIds`, confidence
 └────────────────────────────┘
    │
    ▼
 ┌─────────────────────┐
-│ 5. Vector Builder   │  → build 4-axis vectors (relevance, sentiment,
-│                     │    novelty, energy) and store in ANN index
+│ 5. Quality          │  → Collect all quality-scored segments
+│    Aggregation      │    Read enhanced SRT format (9 dimensions)
+│                     │    Preserve comprehensive quality vectors
+│                     │    Output: project.ranked.srt (master file)
 └─────────────────────┘
    │
    ▼
 ┌─────────────────────┐
-│ 6. Scalar Ranking   │  → ANN top-K search with user weight vector
+│ 6. Weighted Ranking │  → User weight vector application:
+│                     │    • compositeScore: 100f (primary)
+│                     │    • relevance/sentiment/novelty/energy: user input
+│                     │    • focus/clarity/emotion/flubScore: 0f (pending UI)
+│                     │    Sort by weighted quality score
+│                     │    Output: project.ordered.srt (best segments first)
 └─────────────────────┘
    │
    ▼
 ┌─────────────────────┐
-│ 7. Diversity (MMR)  │  → re-rank for novelty, output shortlist
+│ 7. Diversity (MMR)  │  → Maximal Marginal Relevance
+│                     │    λ×relevance - (1-λ)×(1-novelty)
+│                     │    Balance quality vs diversity
+│                     │    Output: project.novelty.srt (diverse shortlist)
 └─────────────────────┘
    │
    ▼
 ┌────────────────────────────┐
-│ 8. Dialogue Sequencer      │  → alternate speakers, reply matching,    
+│ 8. Dialogue Sequencer      │  → Speaker alternation enforcement
+│                            │    LLM reply-score calculation
+│                            │    λ×baseScore + (1-λ)×replyScore
+│                            │    Output: project.dialogue.srt (conversational flow)
 └────────────────────────────┘
    │
    ▼
 ┌────────────────────────────┐
-│ 9. Energy-Based Expansion  │  → ±Δ seconds, sentence-boundary snap
+│ 9. Energy-Based Expansion  │  → Dynamic temporal windows:
+│                            │    • Low energy: 0.8×base window
+│                            │    • High energy: 1.3×base window
+│                            │    Energy score drives expansion
+│                            │    Output: project.expanded.srt (context-aware timing)
 └────────────────────────────┘
    │
    ▼
 ┌────────────────────────────┐
-│10. Hard Constraints        │  → runtime caps, deterministic ordering
+│10. Hard Constraints        │  → Runtime caps enforcement
+│                            │    Greedy selection by rank order
+│                            │    Target duration compliance
+│                            │    Output: project.trim.srt (final selection)
 └────────────────────────────┘
    │
    ▼
 ┌─────────────────────┐
-│11. Render           │  → generate FFmpeg concat,
-│                     │    apply transitions, subtitles
+│11. Render           │  → Parse enhanced SRT metadata
+│                     │    FFmpeg segment extraction
+│                     │    Optimal encoding detection
+│                     │    Concatenate with transitions
+│                     │    Output: Final MP4 video
 └─────────────────────┘
+```
+
+## Key Changes from Original Workflow
+
+### **Step 3: Take Layer + Quality Vector** (Major Enhancement)
+- **Before**: Simple duplicate detection with basic quality assessment
+- **Now**: Comprehensive 9-dimensional quality scoring integrated with duplicate detection
+- **Impact**: Much richer quality data flows through entire pipeline
+
+### **Step 5: Quality Aggregation** (Renamed from "Vector Builder")
+- **Before**: "Vector Builder" with 4-axis vectors stored in ANN index
+- **Now**: "Quality Aggregation" that collects pre-computed 9-dimensional vectors from Take Layer
+- **Impact**: Eliminates redundant LLM calls, uses richer quality data
+
+### **Step 6: Weighted Ranking** (Enhanced from "Scalar Ranking")
+- **Before**: "Scalar Ranking" with ANN top-K search
+- **Now**: "Weighted Ranking" using user-defined weights across 9 quality dimensions
+- **Impact**: More sophisticated ranking with user control over multiple quality aspects
+
+### **Data Flow Improvements**
+1. **Quality vectors generated once** in Take Layer, then reused throughout pipeline
+2. **Enhanced SRT format** carries all 9 quality metrics between stages
+3. **Speaker metadata flows separately** and merges with quality data for dialogue sequencing
+4. **No redundant scoring** - each segment scored comprehensively once
+
+### **Quality Metrics Evolution**
+- **Traditional**: FlubScore (filler word detection)
+- **LLM-based**: Relevance, Sentiment, Novelty, Energy (prompt-aware)
+- **Future-ready**: Focus, Clarity, Emotion (placeholders for CV/audio analysis)
+- **Composite**: Weighted combination respecting user preferences
+
+This updated workflow shows how quality assessment has evolved from a simple 4-dimensional vector to a comprehensive 9-dimensional quality system that's generated early and utilized throughout the entire pipeline for better content curation and user control.
