@@ -71,7 +71,16 @@ namespace FrameFlow.Utilities
                         i++; // Move to energy score line
                         var energy = float.Parse(lines[i].Split(": ")[1]);
 
-                        i++; // Move to text line
+                        // Skip additional quality vector fields from enhanced SRT format
+                        while (i < lines.Length && lines[i].Contains(":") && 
+                               (lines[i].StartsWith("Focus:") || lines[i].StartsWith("Clarity:") || 
+                                lines[i].StartsWith("Emotion:") || lines[i].StartsWith("FlubScore:") || 
+                                lines[i].StartsWith("CompositeScore:")))
+                        {
+                            i++;
+                        }
+
+                        // Now at text line
                         var textBuilder = new StringBuilder();
                         while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]))
                         {

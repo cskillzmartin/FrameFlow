@@ -9,6 +9,7 @@ namespace FrameFlow.Utilities
     {
         private static TakeManager? _instance;
         private readonly object _lock = new object();
+        private readonly QualityScorer _qualityScorer;
 
         // Common filler words for flub detection
         private readonly HashSet<string> _fillerWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -17,7 +18,10 @@ namespace FrameFlow.Utilities
             "sort of", "kind of", "i mean", "well", "so", "right", "okay", "alright", "yeah"
         };
 
-        private TakeManager() { }
+        private TakeManager() 
+        { 
+            _qualityScorer = new QualityScorer();
+        }
 
         public static TakeManager Instance
         {
@@ -37,6 +41,7 @@ namespace FrameFlow.Utilities
             public TimeSpan End { get; set; }
             public string FileName { get; set; } = string.Empty;
             public float QualityScore { get; set; }
+            public QualityScorer.QualityVector? QualityVector { get; set; }
         }
 
         // Data structure for segment clusters
@@ -91,7 +96,7 @@ namespace FrameFlow.Utilities
                 var parseTasks = srtFiles.Select(async srtFile =>
                 {
                     var fileName = Path.GetFileName(srtFile);
-                    var segments = await ParseSrtFileAsync(srtFile, fileName);
+                    var segments = await ParseSrtFileAsync(srtFile, fileName, settings);
                     return (fileName, segments);
                 });
 
@@ -121,9 +126,14 @@ namespace FrameFlow.Utilities
                 // ================================================
                 foreach (var group in segmentsByFile)
                 {
-                    var outputPath = Path.Combine(renderDir, group.Key);
+                    // Convert video filename back to SRT filename for output
+                    var videoFileName = group.Key;
+                    var baseFileName = Path.GetFileNameWithoutExtension(videoFileName);
+                    var srtFileName = $"{baseFileName}.srt";
+                    var outputPath = Path.Combine(renderDir, srtFileName);
+                    
                     await WriteCanonicalSegmentsAsync(group.OrderBy(s => s.Start).ToList(), outputPath);
-                    System.Diagnostics.Debug.WriteLine($"Take layer processing completed for {group.Key}. Output: {outputPath}");
+                    System.Diagnostics.Debug.WriteLine($"Take layer processing completed for {videoFileName}. Output: {outputPath}");
                 }
 
                 return true;
@@ -138,10 +148,14 @@ namespace FrameFlow.Utilities
         /// <summary>
         /// Parse SRT file and return segments with filename attached
         /// </summary>
-        private async Task<List<SrtSegment>> ParseSrtFileAsync(string filePath, string fileName)
+        private async Task<List<SrtSegment>> ParseSrtFileAsync(string filePath, string fileName, StorySettings settings)
         {
             var segments = new List<SrtSegment>();
             var lines = await File.ReadAllLinesAsync(filePath);
+            
+            // Convert SRT filename to actual video filename
+            var srtFileName = Path.GetFileNameWithoutExtension(fileName);
+            var videoFileName = FindMatchingVideoFile(srtFileName);
             
             for (int i = 0; i < lines.Length;)
             {
@@ -176,11 +190,12 @@ namespace FrameFlow.Utilities
                             Text = textBuilder.ToString().Trim(),
                             Start = start,
                             End = end,
-                            FileName = fileName
+                            FileName = videoFileName
                         };
 
-                        // Calculate quality score for this segment
-                        segment.QualityScore = CalculateQualityScore(segment, new TakeLayerSettings());
+                        // Calculate comprehensive quality vector for this segment
+                        segment.QualityVector = await _qualityScorer.ScoreSegmentAsync(segment.Text, settings.Prompt, settings.TakeLayerSettings);
+                        segment.QualityScore = segment.QualityVector.Value.CompositeScore;
                         
                         segments.Add(segment);
                     }
@@ -279,6 +294,7 @@ namespace FrameFlow.Utilities
             bool levenshteinMatch = normalizedDistance <= (settings.LevenshteinThreshold / 100f); // convert percentage threshold
             bool cosineMatch = cosineSimilarity >= settings.CosineSimilarityThreshold;
 
+            //returns true if either metric indicates similarity
             return levenshteinMatch || cosineMatch;
         }
 
@@ -362,59 +378,43 @@ namespace FrameFlow.Utilities
         {
             if (!cluster.Segments.Any()) return null;
 
-            // Recalculate quality scores with current settings
-            foreach (var segment in cluster.Segments)
-            {
-                segment.QualityScore = CalculateQualityScore(segment, settings);
-            }
+            // Use existing quality scores (already calculated with comprehensive vector)
+            // No need to recalculate since they were computed with the same settings
 
             // Return segment with highest quality score
             return cluster.Segments.OrderByDescending(s => s.QualityScore).First();
         }
 
+        // Legacy quality scoring methods removed - now handled by QualityScorer class
+
         /// <summary>
-        /// Calculate quality score for a segment (currently FlubScore only)
+        /// Find the matching video file for a given base filename
         /// </summary>
-        private float CalculateQualityScore(SrtSegment segment, TakeLayerSettings settings)
+        private string FindMatchingVideoFile(string baseFileName)
         {
-            // Current implementation: FlubScore only
-            float flubScore = CalculateFlubScore(segment.Text);
+            // Get the current project's media directory
+            var mediaDir = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "media");
             
-            // Placeholder for future scoring components
-            float relevanceScore = 0f;  // Placeholder
-            float focusScore = 0f;      // Placeholder  
-            float energyScore = 0f;     // Placeholder
+            // Search for matching video files using supported formats
+            foreach (var format in App.Settings.Instance.SupportedVideoFormats)
+            {
+                var videoFileName = $"{baseFileName}{format}";
+                var videoFilePath = Path.Combine(mediaDir, videoFileName);
+                
+                if (File.Exists(videoFilePath))
+                {
+                    System.Diagnostics.Debug.WriteLine($"Found matching video file: {videoFileName}");
+                    return videoFileName;
+                }
+            }
 
-            // Calculate weighted score
-            float totalWeight = settings.RelevanceWeight + settings.FlubWeight + 
-                               settings.FocusWeight + settings.EnergyWeight;
-            
-            if (totalWeight == 0) return 0f;
-
-            return (relevanceScore * settings.RelevanceWeight + 
-                   (1 - flubScore) * settings.FlubWeight + 
-                   focusScore * settings.FocusWeight + 
-                   energyScore * settings.EnergyWeight) / totalWeight;
+            // If no matching file found, log warning and return mp4 assumption
+            System.Diagnostics.Debug.WriteLine($"No matching video file found for {baseFileName} in supported formats: {string.Join(", ", App.Settings.Instance.SupportedVideoFormats)}");
+            return $"{baseFileName}.mp4"; // Fallback assumption
         }
 
         /// <summary>
-        /// Calculate flub score (ratio of filler words to total words)
-        /// </summary>
-        private float CalculateFlubScore(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return 0f;
-
-            var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (!words.Any()) return 0f;
-
-            int fillerWordCount = words.Count(word => 
-                _fillerWords.Contains(word.Trim().ToLowerInvariant()));
-
-            return (float)fillerWordCount / words.Length;
-        }
-
-        /// <summary>
-        /// Write canonical segments to output SRT file with enhanced format
+        /// Write canonical segments to output SRT file with enhanced format including quality vector data
         /// </summary>
         private async Task WriteCanonicalSegmentsAsync(List<SrtSegment> segments, string outputPath)
         {
@@ -429,6 +429,24 @@ namespace FrameFlow.Utilities
                 
                 // Write timestamp
                 await writer.WriteLineAsync($"{FormatTimeSpan(segment.Start)} --> {FormatTimeSpan(segment.End)}");
+                
+                // Write filename (for compatibility with downstream processors)
+                await writer.WriteLineAsync(segment.FileName);
+                
+                // Write quality vector scores (if available)
+                if (segment.QualityVector.HasValue)
+                {
+                    var qv = segment.QualityVector.Value;
+                    await writer.WriteLineAsync($"Relevance: {qv.Relevance:F1}");
+                    await writer.WriteLineAsync($"Sentiment: {qv.Sentiment:F1}");
+                    await writer.WriteLineAsync($"Novelty: {qv.Novelty:F1}");
+                    await writer.WriteLineAsync($"Energy: {qv.Energy:F1}");
+                    await writer.WriteLineAsync($"Focus: {qv.Focus:F1}");
+                    await writer.WriteLineAsync($"Clarity: {qv.Clarity:F1}");
+                    await writer.WriteLineAsync($"Emotion: {qv.Emotion:F1}");
+                    await writer.WriteLineAsync($"FlubScore: {qv.FlubScore:F1}");
+                    await writer.WriteLineAsync($"CompositeScore: {qv.CompositeScore:F1}");
+                }
                 
                 // Write text
                 await writer.WriteLineAsync(segment.Text);

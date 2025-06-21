@@ -226,7 +226,12 @@ public partial class Form1 : BaseForm
                             (float)relevanceWeightInput.Value,
                             (float)sentimentWeightInput.Value,
                             (float)noveltyWeightInput.Value,
-                            (float)energyWeightInput.Value
+                            (float)energyWeightInput.Value,
+                            focus: 0f,        // TODO: Add UI controls for these metrics
+                            clarity: 0f,      // TODO: Add UI controls for these metrics
+                            emotion: 0f,      // TODO: Add UI controls for these metrics
+                            flubScore: 0f,    // TODO: Add UI controls for these metrics
+                            compositeScore: 100f  // Use composite score as primary weight
                         ),
                         renderDir  // Pass the render directory
                     );
