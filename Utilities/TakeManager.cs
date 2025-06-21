@@ -294,6 +294,7 @@ namespace FrameFlow.Utilities
             bool levenshteinMatch = normalizedDistance <= (settings.LevenshteinThreshold / 100f); // convert percentage threshold
             bool cosineMatch = cosineSimilarity >= settings.CosineSimilarityThreshold;
 
+            //returns true if either metric indicates similarity
             return levenshteinMatch || cosineMatch;
         }
 
