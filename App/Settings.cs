@@ -60,19 +60,19 @@ namespace FrameFlow.App
         public string WhisperModelPath { get; set; } = string.Empty;
   
         // ONNX Model Directories
-        public string OnnxCpuModelDirectory { get; set; } = Path.Combine(
+        public string OnnxTextCpuModelDirectory { get; set; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "FrameFlow",
             "models",
             "cpu");
 
-        public string OnnxCudaModelDirectory { get; set; } = Path.Combine(
+        public string OnnxTextCudaModelDirectory { get; set; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "FrameFlow",
             "models",
             "cuda");
 
-        public string OnnxDirectMLModelDirectory { get; set; } = Path.Combine(
+        public string OnnxTextDirectMLModelDirectory { get; set; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "FrameFlow",
             "models",
@@ -193,22 +193,25 @@ namespace FrameFlow.App
             WhisperModelPath = string.Empty;
 
             // ONNX Model Directories - Reset to default paths
-            OnnxCpuModelDirectory = Path.Combine(
+            OnnxTextCpuModelDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "FrameFlow",
                 "models",
+                "Text",
                 "cpu");
 
-            OnnxCudaModelDirectory = Path.Combine(
+            OnnxTextCudaModelDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "FrameFlow",
                 "models",
+                "Text",
                 "cuda");
 
-            OnnxDirectMLModelDirectory = Path.Combine(
+            OnnxTextDirectMLModelDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "FrameFlow",
                 "models",
+                "Text",
                 "directml");
 
             PreferredComputeProvider = "CUDA";
@@ -228,9 +231,9 @@ namespace FrameFlow.App
             
             return computeProvider.ToUpper() switch
             {
-                "CUDA" => OnnxCudaModelDirectory,
-                "DIRECTML" => OnnxDirectMLModelDirectory,
-                _ => OnnxCpuModelDirectory
+                "CUDA" => OnnxTextCudaModelDirectory,
+                "DIRECTML" => OnnxTextDirectMLModelDirectory,
+                _ => OnnxTextCpuModelDirectory
             };
         }
     }

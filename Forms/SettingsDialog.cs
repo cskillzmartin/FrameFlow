@@ -47,11 +47,11 @@ namespace FrameFlow.Forms
 
                 // AI Model Settings
                 if (txtCpuModelPath != null)
-                    txtCpuModelPath.Text = App.Settings.Instance.OnnxCpuModelDirectory;
+                    txtCpuModelPath.Text = App.Settings.Instance.OnnxTextCpuModelDirectory;
                 if (txtCudaModelPath != null)
-                    txtCudaModelPath.Text = App.Settings.Instance.OnnxCudaModelDirectory;
+                    txtCudaModelPath.Text = App.Settings.Instance.OnnxTextCudaModelDirectory;
                 if (txtDirectMLModelPath != null)
-                    txtDirectMLModelPath.Text = App.Settings.Instance.OnnxDirectMLModelDirectory;
+                    txtDirectMLModelPath.Text = App.Settings.Instance.OnnxTextDirectMLModelDirectory;
                 if (txtWhisperModelPath != null)
                     txtWhisperModelPath.Text = App.Settings.Instance.WhisperModelPath;
             }
@@ -95,9 +95,9 @@ namespace FrameFlow.Forms
             App.Settings.Instance.PreferredComputeProvider = cmbComputeProvider.Text;
 
             // AI Model Settings
-            App.Settings.Instance.OnnxCpuModelDirectory = txtCpuModelPath.Text;
-            App.Settings.Instance.OnnxCudaModelDirectory = txtCudaModelPath.Text;
-            App.Settings.Instance.OnnxDirectMLModelDirectory = txtDirectMLModelPath.Text;
+            App.Settings.Instance.OnnxTextCpuModelDirectory = txtCpuModelPath.Text;
+            App.Settings.Instance.OnnxTextCudaModelDirectory = txtCudaModelPath.Text;
+            App.Settings.Instance.OnnxTextDirectMLModelDirectory = txtDirectMLModelPath.Text;
             App.Settings.Instance.WhisperModelPath = txtWhisperModelPath.Text;
 
             App.Settings.Instance.Save();
