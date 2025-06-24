@@ -78,11 +78,11 @@ namespace FrameFlow.Utilities
             if (Directory.Exists(preferredDir) && HasModelFiles(preferredDir))
                 return preferredDir;
 
-            string directMLDir = App.Settings.Instance.OnnxDirectMLModelDirectory;
+            string directMLDir = App.Settings.Instance.OnnxTextDirectMLModelDirectory;
             if (Directory.Exists(directMLDir) && HasModelFiles(directMLDir))
                 return directMLDir;
 
-            string cpuDir = App.Settings.Instance.OnnxCpuModelDirectory;
+            string cpuDir = App.Settings.Instance.OnnxTextCpuModelDirectory;
             if (Directory.Exists(cpuDir) && HasModelFiles(cpuDir))
                 return cpuDir;
 

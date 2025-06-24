@@ -79,9 +79,9 @@ public partial class Form1 : BaseForm
             generateButton.Text = "Loading Model...";
 
             // Create model directories if they don't exist
-            Directory.CreateDirectory(App.Settings.Instance.OnnxCpuModelDirectory);
-            Directory.CreateDirectory(App.Settings.Instance.OnnxCudaModelDirectory);
-            Directory.CreateDirectory(App.Settings.Instance.OnnxDirectMLModelDirectory);
+            Directory.CreateDirectory(App.Settings.Instance.OnnxTextCpuModelDirectory);
+            Directory.CreateDirectory(App.Settings.Instance.OnnxTextCudaModelDirectory);
+            Directory.CreateDirectory(App.Settings.Instance.OnnxTextDirectMLModelDirectory);
 
             // Initialize the model
             await Task.Run(() => GenAIManager.Instance);
@@ -95,9 +95,9 @@ public partial class Form1 : BaseForm
             {
                 debugTextBox.AppendText("Model Not Found");
                 debugTextBox.AppendText($"No model files found. Please add model files to one of these directories:\n" +
-                $"CUDA: {App.Settings.Instance.OnnxCudaModelDirectory}\n" +
-                $"DirectML: {App.Settings.Instance.OnnxDirectMLModelDirectory}\n" +
-                $"CPU: {App.Settings.Instance.OnnxCpuModelDirectory}");
+                $"CUDA: {App.Settings.Instance.OnnxTextCudaModelDirectory}\n" +
+                $"DirectML: {App.Settings.Instance.OnnxTextDirectMLModelDirectory}\n" +
+                $"CPU: {App.Settings.Instance.OnnxTextCpuModelDirectory}");
                 debugTextBox.AppendText("----------------------------------------\r\n");
             }
         }

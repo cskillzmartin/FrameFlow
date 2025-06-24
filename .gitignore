@@ -4,9 +4,9 @@
 /bin
 /obj
 /AI Models/Whisper/*.bin
-/AI Models/onnx/cpu/*.onnx
-/AI Models/onnx/cpu/*.data
-/AI Models/onnx/cuda/*.onnx
-/AI Models/onnx/cuda/*.data
-/AI Models/onnx/directml/*.onnx
-/AI Models/onnx/directml/*.data
+/AI Models/text/onnx/cpu/*.onnx
+/AI Models/text/onnx/cpu/*.data
+/AI Models/text/onnx/cuda/*.onnx
+/AI Models/text/onnx/cuda/*.data
+/AI Models/text/onnx/directml/*.onnx
+/AI Models/text/onnx/directml/*.data

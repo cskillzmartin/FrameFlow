@@ -473,12 +473,25 @@ namespace FrameFlow.Forms
             const int VERTICAL_SPACING = 20;
             const int TEXT_BOX_WIDTH = 350;
             const int BUTTON_WIDTH = 75;
+            const int SECTION_SPACING = 30;
             var y = 10;
+
+            // Audio Models Section Header
+            var lblAudioModelsSection = new Label
+            {
+                Text = "Audio Models",
+                Location = new Point(0, y),
+                Size = new Size(200, CONTROL_HEIGHT),
+                Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            y += SECTION_SPACING;
 
             // Whisper Model Path
             var lblWhisperModel = new Label
             {
-                Text = "Whisper Model:",
+                Text = "Whisper Path:",
                 Location = new Point(0, y + 3),
                 Size = new Size(LABEL_WIDTH, CONTROL_HEIGHT),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -498,12 +511,24 @@ namespace FrameFlow.Forms
             };
             btnBrowseWhisper.Click += (s, e) => BrowseForFile(txtWhisperModelPath);
 
-            y += VERTICAL_SPACING;
+            y += SECTION_SPACING;
+
+            // Text Models Section Header
+            var lblTextModelsSection = new Label
+            {
+                Text = "Text Models",
+                Location = new Point(0, y),
+                Size = new Size(200, CONTROL_HEIGHT),
+                Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            y += SECTION_SPACING;
 
             // CPU Model Path
             var lblCpuModel = new Label
             {
-                Text = "CPU Model Path:",
+                Text = "CPU Path:",
                 Location = new Point(0, y + 3),
                 Size = new Size(LABEL_WIDTH, CONTROL_HEIGHT),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -528,7 +553,7 @@ namespace FrameFlow.Forms
             // CUDA Model Path
             var lblCudaModel = new Label
             {
-                Text = "CUDA Model Path:",
+                Text = "CUDA Path:",
                 Location = new Point(0, y + 3),
                 Size = new Size(LABEL_WIDTH, CONTROL_HEIGHT),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -573,11 +598,40 @@ namespace FrameFlow.Forms
             };
             btnBrowseDirectML.Click += (s, e) => BrowseForFolder(txtDirectMLModelPath);
 
+            y += SECTION_SPACING;
+
+            // Multimodal Models Section Header (placeholder for future implementation)
+            var lblMultimodalModelsSection = new Label
+            {
+                Text = "Multimodal Models",
+                Location = new Point(0, y),
+                Size = new Size(200, CONTROL_HEIGHT),
+                Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = SystemColors.GrayText // Grayed out to indicate future feature
+            };
+
+            y += SECTION_SPACING;
+
+            // Placeholder label for multimodal models
+            var lblMultimodalPlaceholder = new Label
+            {
+                Text = "(Coming Soon)",
+                Location = new Point(0, y),
+                Size = new Size(200, CONTROL_HEIGHT),
+                ForeColor = SystemColors.GrayText,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
             panel.Controls.AddRange(new Control[] {
+                lblAudioModelsSection,
                 lblWhisperModel, txtWhisperModelPath, btnBrowseWhisper,
+                lblTextModelsSection,
                 lblCpuModel, txtCpuModelPath, btnBrowseCpu,
                 lblCudaModel, txtCudaModelPath, btnBrowseCuda,
-                lblDirectMLModel, txtDirectMLModelPath, btnBrowseDirectML
+                lblDirectMLModel, txtDirectMLModelPath, btnBrowseDirectML,
+                lblMultimodalModelsSection,
+                lblMultimodalPlaceholder
             });
 
             return panel;
