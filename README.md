@@ -14,6 +14,7 @@ FrameFlow is a professional-grade non-linear video editor powered by AI that hel
   - Energy: Energy level and intensity of the content (0-100)
 - **Multi-Format Support**: Import videos in various formats (.mp4, .avi, .mkv, .mov, .wmv, .flv, .webm)
 - **Dark Mode**: Comfortable editing in low-light environments
+ - **Agentic Orchestration**: Plan-execute-observe-reflect pipeline with per-step timing, evaluation gates, and bounded self-repair
 
 ## Dependencies
 
@@ -98,7 +99,34 @@ FrameFlow is a professional-grade non-linear video editor powered by AI that hel
    - Enter a prompt describing your desired edit
    - Adjust weights to fine-tune the result
    - Set desired output length
-   - Click "Generate" to create your edit
+   - Click "Generate" to run the agentic pipeline
+   - The UI shows step-by-step progress with timings; the agent can attempt automatic self-repair if a gate fails (e.g., missing trimmed SRT before render)
+
+## Agentic Orchestration
+
+The generation flow is coordinated by an agent layer that turns your prompt and settings into a robust, traceable run:
+
+- **Planner**: Uses the text model to propose a JSON plan of steps. Flexible ordering is allowed, but safety is enforced later. The proposed plan is saved as `plan.json` in the render directory.
+- **Tool execution**: The orchestrator executes concrete tools (existing managers) per step and streams progress to the UI.
+- **Observation and logging**: Each step is timed and logged to `run.jsonl` and summarized in `run_report.json`.
+- **Evaluation gate**: After trimming, the agent validates prerequisites for render (e.g., `[project].trim.srt` exists and is non-empty).
+- **Self-repair (bounded)**: If the gate fails, the agent retries trim, increases temporal expansion, and/or temporarily reduces target length before re-trimming. All attempts are logged.
+- **Resume support**: The orchestrator supports resuming from a specific step (UI hooks to expose this are planned).
+
+### Run artifacts
+
+Each run produces a structured set of artifacts under `Project/Renders/<n>/`:
+
+- `plan.json`: Planned steps proposed by the Planner
+- `story_settings.json`: Snapshot of prompt, weights, and generation settings
+- `run.jsonl`: Append-only event log for the run (step start/complete, timings, repairs)
+- `run_report.json`: Human-readable summary (objectives, per-step durations, success/failure)
+- `artifacts.json`: Machine-readable list of output files (e.g., `plan.json`, `story_settings.json`, `[project].trim.srt`, final `.mp4`)
+- Final video: `[project].mp4`
+
+Notes:
+- The LLM proposes the plan only; tool execution is performed by the orchestrator. Tool invocations are whitelisted and validated.
+- Plan order is flexible, but unsafe permutations (e.g., render before trim) are blocked by evaluation gates, and a plan validator may further enforce constraints in future updates.
 
 ## Project Structure
 
@@ -163,6 +191,7 @@ All application settings are configurable through Settings (File → Settings):
    - Review prompt guidelines
    - Monitor GPU memory usage
    - Check CUDA runtime errors in debug output
+   - If the run stops before render with an evaluation failure, check for `[project].trim.srt` in the render folder. The agent will attempt self-repair; if it still fails, inspect `run.jsonl` and `run_report.json` for details.
 
 # FrameFlow Updated Workflow - Quality Scoring Integration
 ```
