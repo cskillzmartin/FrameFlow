@@ -76,7 +76,128 @@ namespace FrameFlow.Utilities.Agent
             artifacts.Add(new { kind = "story_settings", path = System.IO.Path.Combine(request.RenderDirectory, "story_settings.json") });
             artifacts.Add(new { kind = "plan", path = System.IO.Path.Combine(request.RenderDirectory, "plan.json") });
 
-            for (var i = 0; i < steps.Count; i++)
+            // Local helpers
+            async Task<bool> TryRepairAfterTrimAsync(int stepIdx, List<object> stepReportsLocal)
+            {
+                // Attempt 1: re-run trim
+                memory?.Append(new RunEvent { Event = "replan_start", StepIndex = stepIdx, Message = "Retry trim" });
+                var sw1 = Stopwatch.StartNew();
+                try
+                {
+                    var trimTool = _tools.Get("TrimToLength");
+                    await trimTool.ExecuteAsync(request);
+                    sw1.Stop();
+                    var d1 = sw1.ElapsedMilliseconds;
+                    stepReportsLocal.Add(new { id = "trim_retry_1", tool = "TrimToLength", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-d1), completedAtUtc = DateTime.UtcNow, durationMs = d1, success = true });
+
+                    var eval1 = await _evaluator.EvaluateAsync(request);
+                    if (eval1.Pass)
+                    {
+                        // add trimmed artifact
+                        artifacts.Add(new { kind = "trim_srt", path = System.IO.Path.Combine(request.RenderDirectory, $"{request.ProjectName}.trim.srt") });
+                        memory?.Append(new RunEvent { Event = "replan_success", StepIndex = stepIdx, Message = "Trim retry succeeded" });
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sw1.Stop();
+                    stepReportsLocal.Add(new { id = "trim_retry_1", tool = "TrimToLength", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-sw1.ElapsedMilliseconds), completedAtUtc = DateTime.UtcNow, durationMs = sw1.ElapsedMilliseconds, success = false, error = ex.Message });
+                }
+
+                // Attempt 2: increase temporal expansion then trim
+                var originalExpansion = request.StorySettings.TemporalExpansion;
+                request.StorySettings.TemporalExpansion = Math.Min(originalExpansion + 2, 30);
+                memory?.Append(new RunEvent { Event = "replan_adjust", StepIndex = stepIdx, Message = $"Increase temporalExpansion {originalExpansion}->{request.StorySettings.TemporalExpansion}" });
+                var sw2a = Stopwatch.StartNew();
+                try
+                {
+                    var expandTool = _tools.Get("TemporalExpansion");
+                    await expandTool.ExecuteAsync(request);
+                    sw2a.Stop();
+                    var d2a = sw2a.ElapsedMilliseconds;
+                    stepReportsLocal.Add(new { id = "expand_retry_2", tool = "TemporalExpansion", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-d2a), completedAtUtc = DateTime.UtcNow, durationMs = d2a, success = true });
+                }
+                catch (Exception ex)
+                {
+                    sw2a.Stop();
+                    stepReportsLocal.Add(new { id = "expand_retry_2", tool = "TemporalExpansion", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-sw2a.ElapsedMilliseconds), completedAtUtc = DateTime.UtcNow, durationMs = sw2a.ElapsedMilliseconds, success = false, error = ex.Message });
+                }
+
+                var sw2b = Stopwatch.StartNew();
+                try
+                {
+                    var trimTool2 = _tools.Get("TrimToLength");
+                    await trimTool2.ExecuteAsync(request);
+                    sw2b.Stop();
+                    var d2b = sw2b.ElapsedMilliseconds;
+                    stepReportsLocal.Add(new { id = "trim_retry_2", tool = "TrimToLength", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-d2b), completedAtUtc = DateTime.UtcNow, durationMs = d2b, success = true });
+                    var eval2 = await _evaluator.EvaluateAsync(request);
+                    if (eval2.Pass)
+                    {
+                        artifacts.Add(new { kind = "trim_srt", path = System.IO.Path.Combine(request.RenderDirectory, $"{request.ProjectName}.trim.srt") });
+                        memory?.Append(new RunEvent { Event = "replan_success", StepIndex = stepIdx, Message = "Temporal expansion + trim succeeded" });
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sw2b.Stop();
+                    stepReportsLocal.Add(new { id = "trim_retry_2", tool = "TrimToLength", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-sw2b.ElapsedMilliseconds), completedAtUtc = DateTime.UtcNow, durationMs = sw2b.ElapsedMilliseconds, success = false, error = ex.Message });
+                }
+                finally
+                {
+                    // restore original expansion to avoid drift for future runs
+                    request.StorySettings.TemporalExpansion = originalExpansion;
+                }
+
+                // Attempt 3: reduce target minutes and trim
+                var originalMinutes = request.TargetMinutes;
+                var reduced = Math.Max(1, (int)Math.Floor(originalMinutes * 0.9));
+                if (reduced != originalMinutes)
+                {
+                    request.TargetMinutes = reduced;
+                    memory?.Append(new RunEvent { Event = "replan_adjust", StepIndex = stepIdx, Message = $"Reduce targetMinutes {originalMinutes}->{reduced}" });
+                    var sw3 = Stopwatch.StartNew();
+                    try
+                    {
+                        var trimTool3 = _tools.Get("TrimToLength");
+                        await trimTool3.ExecuteAsync(request);
+                        sw3.Stop();
+                        var d3 = sw3.ElapsedMilliseconds;
+                        stepReportsLocal.Add(new { id = "trim_retry_3", tool = "TrimToLength", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-d3), completedAtUtc = DateTime.UtcNow, durationMs = d3, success = true });
+                        var eval3 = await _evaluator.EvaluateAsync(request);
+                        if (eval3.Pass)
+                        {
+                            artifacts.Add(new { kind = "trim_srt", path = System.IO.Path.Combine(request.RenderDirectory, $"{request.ProjectName}.trim.srt") });
+                            memory?.Append(new RunEvent { Event = "replan_success", StepIndex = stepIdx, Message = "Reduced length + trim succeeded" });
+                            return true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        sw3.Stop();
+                        stepReportsLocal.Add(new { id = "trim_retry_3", tool = "TrimToLength", startedAtUtc = DateTime.UtcNow.AddMilliseconds(-sw3.ElapsedMilliseconds), completedAtUtc = DateTime.UtcNow, durationMs = sw3.ElapsedMilliseconds, success = false, error = ex.Message });
+                    }
+                    finally
+                    {
+                        request.TargetMinutes = originalMinutes;
+                    }
+                }
+
+                memory?.Append(new RunEvent { Event = "replan_fail", StepIndex = stepIdx, Message = "All repair attempts failed" });
+                return false;
+            }
+
+            // Determine starting index based on run mode
+            int startIndex = 0;
+            if (request.RunMode == AgentRunMode.FromStepId && !string.IsNullOrWhiteSpace(request.FromStepId))
+            {
+                var idxFound = steps.FindIndex(s => string.Equals(s.id, request.FromStepId, StringComparison.OrdinalIgnoreCase));
+                if (idxFound >= 0) startIndex = idxFound;
+            }
+
+            for (var i = startIndex; i < steps.Count; i++)
             {
                 var (id, toolName, ui, log) = steps[i];
                 var stepIdx = i + 1;
@@ -121,6 +242,12 @@ namespace FrameFlow.Utilities.Agent
                         LogMessage = $"✓ {log} ({secs}s)"
                     });
 
+                    // Record trimmed artifact on initial success
+                    if (string.Equals(id, "trim", StringComparison.OrdinalIgnoreCase))
+                    {
+                        artifacts.Add(new { kind = "trim_srt", path = System.IO.Path.Combine(request.RenderDirectory, $"{request.ProjectName}.trim.srt") });
+                    }
+
                     // Minimal evaluation gate: after trim, ensure prerequisites for render
                     if (string.Equals(id, "trim", StringComparison.OrdinalIgnoreCase))
                     {
@@ -130,41 +257,46 @@ namespace FrameFlow.Utilities.Agent
                             var reason = eval.Reason ?? "evaluation failed";
                             var emsg = $"Evaluation did not pass before render: {reason}";
                             memory?.Append(new RunEvent { Event = "evaluation_fail", StepIndex = stepIdx, Message = emsg });
-                            result.Errors.Add(emsg);
-                            // Write report before returning
-                            runStopwatch.Stop();
-                            var reportFail = new
+                            // Attempt bounded self-repair
+                            var repaired = await TryRepairAfterTrimAsync(stepIdx, stepReports);
+                            if (!repaired)
                             {
-                                version = 1,
-                                project = request.ProjectName,
-                                renderDirectory = request.RenderDirectory,
-                                outputPath = request.OutputVideoPath,
-                                success = false,
-                                totalDurationMs = runStopwatch.ElapsedMilliseconds,
-                                objectives = new
+                                result.Errors.Add(emsg);
+                                // Write report before returning
+                                runStopwatch.Stop();
+                                var reportFail = new
                                 {
-                                    targetMinutes = request.TargetMinutes,
-                                    relevance = request.StorySettings.Relevance,
-                                    sentiment = request.StorySettings.Sentiment,
-                                    novelty = request.StorySettings.Novelty,
-                                    energy = request.StorySettings.Energy,
-                                    temporalExpansion = request.StorySettings.TemporalExpansion,
-                                    genai = new
+                                    version = 1,
+                                    project = request.ProjectName,
+                                    renderDirectory = request.RenderDirectory,
+                                    outputPath = request.OutputVideoPath,
+                                    success = false,
+                                    totalDurationMs = runStopwatch.ElapsedMilliseconds,
+                                    objectives = new
                                     {
-                                        temperature = request.StorySettings.GenAISettings.Temperature,
-                                        topP = request.StorySettings.GenAISettings.TopP,
-                                        repetitionPenalty = request.StorySettings.GenAISettings.RepetitionPenalty,
-                                        seed = request.StorySettings.GenAISettings.RandomSeed
-                                    }
-                                },
-                                steps = stepReports,
-                                artifacts
-                            };
-                            var jsonFail = JsonSerializer.Serialize(reportFail, new JsonSerializerOptions { WriteIndented = true });
-                            memory?.SaveText("run_report.json", jsonFail);
-                            var artifactsJsonFail = JsonSerializer.Serialize(artifacts, new JsonSerializerOptions { WriteIndented = true });
-                            memory?.SaveText("artifacts.json", artifactsJsonFail);
-                            return result;
+                                        targetMinutes = request.TargetMinutes,
+                                        relevance = request.StorySettings.Relevance,
+                                        sentiment = request.StorySettings.Sentiment,
+                                        novelty = request.StorySettings.Novelty,
+                                        energy = request.StorySettings.Energy,
+                                        temporalExpansion = request.StorySettings.TemporalExpansion,
+                                        genai = new
+                                        {
+                                            temperature = request.StorySettings.GenAISettings.Temperature,
+                                            topP = request.StorySettings.GenAISettings.TopP,
+                                            repetitionPenalty = request.StorySettings.GenAISettings.RepetitionPenalty,
+                                            seed = request.StorySettings.GenAISettings.RandomSeed
+                                        }
+                                    },
+                                    steps = stepReports,
+                                    artifacts
+                                };
+                                var jsonFail = JsonSerializer.Serialize(reportFail, new JsonSerializerOptions { WriteIndented = true });
+                                memory?.SaveText("run_report.json", jsonFail);
+                                var artifactsJsonFail = JsonSerializer.Serialize(artifacts, new JsonSerializerOptions { WriteIndented = true });
+                                memory?.SaveText("artifacts.json", artifactsJsonFail);
+                                return result;
+                            }
                         }
                     }
                 }

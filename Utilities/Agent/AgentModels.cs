@@ -4,13 +4,22 @@ using System.Text.Json.Serialization;
 
 namespace FrameFlow.Utilities.Agent
 {
+    public enum AgentRunMode
+    {
+        Full,
+        Resume,
+        FromStepId
+    }
+
     public sealed class AgentRequest
     {
         public required string ProjectName { get; init; }
         public required string ProjectPath { get; init; }
         public required string RenderDirectory { get; init; }
         public required Models.StorySettings StorySettings { get; init; }
-        public required int TargetMinutes { get; init; }
+        public int TargetMinutes { get; set; }
+        public AgentRunMode RunMode { get; set; } = AgentRunMode.Full;
+        public string? FromStepId { get; set; }
 
         // Derived convenience values
         public string OutputVideoPath => System.IO.Path.Combine(RenderDirectory, $"{ProjectName}.mp4");

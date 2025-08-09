@@ -208,7 +208,8 @@ public partial class Form1 : BaseForm
                     ProjectPath = App.ProjectHandler.Instance.CurrentProjectPath,
                     RenderDirectory = renderDir,
                     StorySettings = storySettings,
-                    TargetMinutes = selectedLength
+                    TargetMinutes = selectedLength,
+                    RunMode = AgentRunMode.Full
                 };
 
                 await Task.Run(async () =>
