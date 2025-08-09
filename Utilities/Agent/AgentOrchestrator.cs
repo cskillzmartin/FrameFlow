@@ -251,6 +251,25 @@ namespace FrameFlow.Utilities.Agent
             runStopwatch.Stop();
             memory?.Append(new RunEvent { Event = "run_complete", StepIndex = total, Message = request.OutputVideoPath });
 
+            // Final semantic alignment check between prompt and trimmed script
+            var alignment = await _evaluator.EvaluatePromptAlignmentAsync(request);
+            if (!alignment.Pass)
+            {
+                var reason = alignment.Reason ?? "Low alignment";
+                memory?.Append(new RunEvent { Event = "alignment_warn", StepIndex = total, Message = $"Prompt alignment below threshold: {reason}" });
+
+                // Try automatic alignment repair (up to 3 retries)
+                var repaired = await TryAutoRepairAlignmentAsync(request, memory, artifactsTracker, stepReports);
+                if (repaired)
+                {
+                    memory?.Append(new RunEvent { Event = "alignment_repair_success", StepIndex = total, Message = "Script re-aligned with prompt" });
+                }
+                else
+                {
+                    memory?.Append(new RunEvent { Event = "alignment_repair_fail", StepIndex = total, Message = "Unable to sufficiently align script after retries" });
+                }
+            }
+
             // Add final render artifact
             artifactsTracker.Add("render_output", request.OutputVideoPath);
 
@@ -336,6 +355,101 @@ namespace FrameFlow.Utilities.Agent
                     break;
                 }
             }
+        }
+
+        private void AdjustSettingsForAlignment(AgentRequest request, int attemptIndex, out (float relevance, float novelty, int expansion) original)
+        {
+            original = (request.StorySettings.Relevance, request.StorySettings.Novelty, request.StorySettings.TemporalExpansion);
+            // Increase relevance and novelty with bounded caps
+            var relBoost = 10f * attemptIndex;
+            var novBoost = 10f * attemptIndex;
+            request.StorySettings.Relevance = Math.Min(100f, request.StorySettings.Relevance + relBoost);
+            request.StorySettings.Novelty = Math.Min(100f, request.StorySettings.Novelty + novBoost);
+            // Slightly expand context window to retain more relevant content
+            request.StorySettings.TemporalExpansion = Math.Min(30, request.StorySettings.TemporalExpansion + attemptIndex);
+        }
+
+        private void RestoreSettings((float relevance, float novelty, int expansion) original, AgentRequest request)
+        {
+            request.StorySettings.Relevance = original.relevance;
+            request.StorySettings.Novelty = original.novelty;
+            request.StorySettings.TemporalExpansion = original.expansion;
+        }
+
+        private async Task<bool> TryAutoRepairAlignmentAsync(AgentRequest request, AgentMemory? memory, ArtifactTracker artifacts, List<object> stepReports)
+        {
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                memory?.Append(new RunEvent { Event = "alignment_repair_start", StepIndex = null, Message = $"Attempt {attempt}/3" });
+
+                AdjustSettingsForAlignment(request, attempt, out var orig);
+                try
+                {
+                    // Re-run ranking and downstream pipeline
+                    var sequence = new[]
+                    {
+                        (id: $"realign_rank_{attempt}", tool: "RankOrder"),
+                        (id: $"realign_novelty_{attempt}", tool: "NoveltyReRank"),
+                        (id: $"realign_dialogue_{attempt}", tool: "SequenceDialogue"),
+                        (id: $"realign_expand_{attempt}", tool: "TemporalExpansion"),
+                        (id: $"realign_trim_{attempt}", tool: "TrimToLength")
+                    };
+
+                    foreach (var (id, toolName) in sequence)
+                    {
+                        var stepStart = DateTime.UtcNow;
+                        var sw = Stopwatch.StartNew();
+                        try
+                        {
+                            var tool = _tools.Get(toolName);
+                            await tool.ExecuteAsync(request);
+                            sw.Stop();
+                            var durationMs = sw.ElapsedMilliseconds;
+                            stepReports.Add(new { id, tool = toolName, startedAtUtc = stepStart, completedAtUtc = DateTime.UtcNow, durationMs, success = true });
+                            memory?.Append(new RunEvent { Event = "alignment_step", StepIndex = null, Message = $"{toolName} ✓" });
+
+                            var stepEval = await _evaluator.EvaluateStepAsync(toolName, request);
+                            if (!stepEval.Pass)
+                            {
+                                memory?.Append(new RunEvent { Event = "alignment_step_fail", StepIndex = null, Message = $"{toolName} output missing: {stepEval.Reason}" });
+                                RestoreSettings(orig, request);
+                                return false;
+                            }
+
+                            RecordArtifactsForTool(toolName, request, artifacts);
+                        }
+                        catch (Exception ex)
+                        {
+                            sw.Stop();
+                            stepReports.Add(new { id, tool = toolName, startedAtUtc = stepStart, completedAtUtc = DateTime.UtcNow, durationMs = sw.ElapsedMilliseconds, success = false, error = ex.Message });
+                            memory?.Append(new RunEvent { Event = "alignment_step_error", StepIndex = null, Message = $"{toolName} failed: {ex.Message}" });
+                            RestoreSettings(orig, request);
+                            return false;
+                        }
+                    }
+
+                    // Evaluate alignment again
+                    var alignment = await _evaluator.EvaluatePromptAlignmentAsync(request);
+                    if (alignment.Pass)
+                    {
+                        memory?.Append(new RunEvent { Event = "alignment_check", StepIndex = null, Message = "Alignment OK after repair" });
+                        return true;
+                    }
+                    else
+                    {
+                        var reason = alignment.Reason ?? "Low alignment";
+                        memory?.Append(new RunEvent { Event = "alignment_check", StepIndex = null, Message = $"Still misaligned: {reason}" });
+                        // continue to next attempt (keep boosted settings cumulative for the attempt only)
+                    }
+                }
+                finally
+                {
+                    // Restore for next attempt to avoid cumulative drift across attempts
+                    RestoreSettings(orig, request);
+                }
+            }
+
+            return false;
         }
 
         private void WriteFailReport(AgentRequest request, List<object> stepReports, IReadOnlyList<object> artifacts, long totalDurationMs, AgentMemory? memory)
