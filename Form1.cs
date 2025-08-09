@@ -1,5 +1,7 @@
 using FrameFlow.Forms;
 using FrameFlow.Utilities;
+using FrameFlow.Utilities.Agent;
+using FrameFlow.Utilities.Agent.Tools;
 using FrameFlow.Models;
 using System.Text.Json;
 
@@ -185,111 +187,62 @@ public partial class Form1 : BaseForm
 
             try
             {
+                // Create agent components
+                var memory = new AgentMemory(renderDir);
+
+                var registry = new ToolRegistry();
+                registry.Register(new ProcessTakesTool());
+                registry.Register(new SpeakerAnalysisTool());
+                registry.Register(new RankTranscriptsTool());
+                registry.Register(new RankOrderTool());
+                registry.Register(new NoveltyReRankTool());
+                registry.Register(new DialogueSequenceTool());
+                registry.Register(new TemporalExpansionTool());
+                registry.Register(new TrimToLengthTool());
+                registry.Register(new RenderVideoTool());
+
+                var orchestrator = new AgentOrchestrator(registry);
+                var agentRequest = new AgentRequest
+                {
+                    ProjectName = App.ProjectHandler.Instance.CurrentProject.Name,
+                    ProjectPath = App.ProjectHandler.Instance.CurrentProjectPath,
+                    RenderDirectory = renderDir,
+                    StorySettings = storySettings,
+                    TargetMinutes = selectedLength
+                };
+
                 await Task.Run(async () =>
                 {
-                    // Step 0: Analyze takes
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 1/9: Analyzing takes...\r\n");
-                        generateButton.Text = "Analyzing (1/9)";
-                    });
-                    await TakeManager.Instance.ProcessTakeLayerAsync(storySettings, renderDir);
+                    var res = await orchestrator.StartAsync(
+                        agentRequest,
+                        onProgress: (p) =>
+                        {
+                            this.Invoke(() =>
+                            {
+                                debugTextBox.AppendText(p.LogMessage + "\r\n");
+                                generateButton.Text = p.UiText;
+                            });
+                        },
+                        memory: memory);
 
-                    // NEW Step 1: Speaker & Shot Analysis
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 2/9: Analyzing speakers and shots...\r\n");
-                        generateButton.Text = "Speaker Analysis (2/9)";
-                    });
-                    await SpeakerManager.Instance.ProcessSpeakerAnalysisAsync(
-                        App.ProjectHandler.Instance.CurrentProject.Name,
-                        renderDir
-                    );
-
-                    // Step 1: Ranking transcripts
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 3/9: Analyzing transcripts...\r\n");
-                        generateButton.Text = "Analyzing (3/9)";
-                    });
-                    await StoryManager.Instance.RankProjectTranscriptsAsync(
-                        App.ProjectHandler.Instance.CurrentProject,
-                        storySettings,
-                        renderDir  // Pass the render directory
-                    );
-
-                    // Step 2: Ranking order
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 4/9: Ranking segments...\r\n");
-                        generateButton.Text = "Ranking (4/9)";
-                    });
-                    await StoryManager.Instance.RankOrder(
-                        App.ProjectHandler.Instance.CurrentProject.Name,
-                        new StoryManager.RankingWeights(
-                            (float)relevanceWeightInput.Value,
-                            (float)sentimentWeightInput.Value,
-                            (float)noveltyWeightInput.Value,
-                            (float)energyWeightInput.Value,
-                            focus: 0f,        // TODO: Add UI controls for these metrics
-                            clarity: 0f,      // TODO: Add UI controls for these metrics
-                            emotion: 0f,      // TODO: Add UI controls for these metrics
-                            flubScore: 0f,    // TODO: Add UI controls for these metrics
-                            compositeScore: 100f  // Use composite score as primary weight
-                        ),
-                        renderDir  // Pass the render directory
-                    );
-
-                    // step 3: novelty rerank
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 5/9: Novelty rerank...\r\n");
-                        generateButton.Text = "Reranking (5/9)";
-                    });
-                    await StoryManager.Instance.NoveltyReRank(
-                        App.ProjectHandler.Instance.CurrentProject.Name, 
-                        storySettings.Novelty, 
-                        renderDir);
-
-                    // NEW step 4: dialogue sequencing
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 6/9: Sequencing dialogue...\r\n");
-                        generateButton.Text = "Dialogue (6/9)";
-                    });
-                    await DialogueManager.Instance.SequenceDialogueAsync(
-                        App.ProjectHandler.Instance.CurrentProject.Name,
-                        storySettings.Novelty,
-                        renderDir);
-
-                    // step 5: temporal expansion
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 7/9: Temporal expansion...\r\n");
-                        generateButton.Text = "Expanding (7/9)";
-                    });
-                    await StoryManager.Instance.TemporalExpansion(
-                        App.ProjectHandler.Instance.CurrentProject.Name, storySettings.TemporalExpansion, renderDir);   
-
-                   
-                    // Step 6: Trimming to length
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 8/9: Trimming to length...\r\n");
-                        generateButton.Text = "Trimming (8/9)";
-                    });
-                    await StoryManager.Instance.TrimRankOrder(
-                        App.ProjectHandler.Instance.CurrentProject.Name,
-                        selectedLength,
-                        renderDir  // Pass the render directory
-                    );
-
-                    // Step 7: Rendering video
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("Step 9/9: Rendering final video...\r\n");
-                        generateButton.Text = "Rendering (9/9)";
-                    });
-                    await RenderManager.Instance.RenderVideoAsync(
-                        App.ProjectHandler.Instance.CurrentProject.Name,
-                        Path.Combine(renderDir, $"{App.ProjectHandler.Instance.CurrentProject.Name}.mp4"),
-                        renderDir  // Pass the render directory
-                    );
-
-                    this.Invoke(() => {
-                        debugTextBox.AppendText("✓ Video generation complete!\r\n");
-                        debugTextBox.AppendText("----------------------------------------\r\n");
+                    this.Invoke(() =>
+                    {
+                        if (res.Success)
+                        {
+                            debugTextBox.AppendText("✓ Video generation complete!\r\n");
+                            debugTextBox.AppendText($"Output: {Path.Combine(renderDir, $"{App.ProjectHandler.Instance.CurrentProject.Name}.mp4")}\r\n");
+                            debugTextBox.AppendText($"Report: {Path.Combine(renderDir, "run_report.json")}\r\n");
+                            debugTextBox.AppendText("----------------------------------------\r\n");
+                        }
+                        else
+                        {
+                            debugTextBox.AppendText("Generation failed.\r\n");
+                            foreach (var err in res.Errors)
+                            {
+                                debugTextBox.AppendText("Error: " + err + "\r\n");
+                            }
+                            debugTextBox.AppendText("----------------------------------------\r\n");
+                        }
                     });
                 });
             }
@@ -667,6 +620,9 @@ public partial class Form1 : BaseForm
     {
         var rendersPath = Path.Combine(App.ProjectHandler.Instance.CurrentProjectPath, "Renders");
         
+        // Ensure the renders root exists
+        Directory.CreateDirectory(rendersPath);
+
         // Get all existing numbered directories
         var directories = Directory.GetDirectories(rendersPath)
             .Select(d => Path.GetFileName(d))
