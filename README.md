@@ -14,7 +14,11 @@ FrameFlow is a professional-grade non-linear video editor powered by AI that hel
   - Energy: Energy level and intensity of the content (0-100)
 - **Multi-Format Support**: Import videos in various formats (.mp4, .avi, .mkv, .mov, .wmv, .flv, .webm)
 - **Dark Mode**: Comfortable editing in low-light environments
- - **Agentic Orchestration**: Plan-execute-observe-reflect pipeline with per-step timing, evaluation gates, and bounded self-repair
+- **Agentic Orchestration**: Plan–execute–observe–reflect pipeline with:
+  - Per-step output validation and automatic artifact tracking
+  - Plan validation and safe re-ordering
+  - Bounded self-repair on failures (trim and alignment)
+  - Prompt alignment check with up to 3 auto-repair attempts
 
 ## Dependencies
 
@@ -108,9 +112,11 @@ The generation flow is coordinated by an agent layer that turns your prompt and 
 
 - **Planner**: Uses the text model to propose a JSON plan of steps. Flexible ordering is allowed, but safety is enforced later. The proposed plan is saved as `plan.json` in the render directory.
 - **Tool execution**: The orchestrator executes concrete tools (existing managers) per step and streams progress to the UI.
+- **Per-step output validation**: After each step, expected outputs are verified (e.g., ranked/ordered/novelty/expanded/trim SRTs, speaker meta). Missing outputs fail fast (trim uses bounded repair).
 - **Observation and logging**: Each step is timed and logged to `run.jsonl` and summarized in `run_report.json`.
 - **Evaluation gate**: After trimming, the agent validates prerequisites for render (e.g., `[project].trim.srt` exists and is non-empty).
 - **Self-repair (bounded)**: If the gate fails, the agent retries trim, increases temporal expansion, and/or temporarily reduces target length before re-trimming. All attempts are logged.
+- **Prompt alignment**: Final script is evaluated against the prompt via keyword coverage and optional LLM scoring. If misaligned, the agent performs up to 3 auto-repair attempts (see below).
 - **Resume support**: The orchestrator supports resuming from a specific step (UI hooks to expose this are planned).
 
 ### Run artifacts
@@ -118,15 +124,43 @@ The generation flow is coordinated by an agent layer that turns your prompt and 
 Each run produces a structured set of artifacts under `Project/Renders/<n>/`:
 
 - `plan.json`: Planned steps proposed by the Planner
+- `plan_validated.json`: Validated/repaired plan (canonical order, constraints applied)
 - `story_settings.json`: Snapshot of prompt, weights, and generation settings
 - `run.jsonl`: Append-only event log for the run (step start/complete, timings, repairs)
 - `run_report.json`: Human-readable summary (objectives, per-step durations, success/failure)
-- `artifacts.json`: Machine-readable list of output files (e.g., `plan.json`, `story_settings.json`, `[project].trim.srt`, final `.mp4`)
-- Final video: `[project].mp4`
+- `artifacts.json`: Machine-readable manifest with de-duplicated outputs:
+  - Take layer outputs: all `*.srt` produced in the render directory
+  - Speaker analysis: `{project}.speaker.meta.json`, `{project}.speaker.meta.embeddings.bin` (if present)
+  - Ranking/ordering: `{project}.ranked.srt`, `{project}.ordered.srt`
+  - Diversity/dialogue: `{project}.novelty.srt`
+  - Expansion: `{project}.expanded.srt`
+  - Final selection: `{project}.trim.srt`
+  - Final render: output `.mp4`
+- Final video: `{project}.mp4`
 
 Notes:
 - The LLM proposes the plan only; tool execution is performed by the orchestrator. Tool invocations are whitelisted and validated.
-- Plan order is flexible, but unsafe permutations (e.g., render before trim) are blocked by evaluation gates, and a plan validator may further enforce constraints in future updates.
+- Plan order is flexible, but unsafe permutations (e.g., render before trim) are blocked by evaluation gates; the validator enforces canonical order and constraints.
+
+### Prompt alignment and auto-repair
+
+The agent evaluates whether the final trimmed script answers the user prompt:
+- Keyword coverage heuristic on the trimmed script vs prompt
+- Optional LLM-based alignment score (0–100) if models are available
+- Pass threshold: coverage ≥ 0.5 OR LLM score ≥ 70
+
+If alignment fails, the agent performs up to 3 auto-repair attempts:
+1. Temporarily boost `StorySettings.Relevance` and `StorySettings.Novelty` (bounded to 100) and slightly increase `TemporalExpansion`.
+2. Re-run the downstream sequence: `RankOrder` → `NoveltyReRank` → `SequenceDialogue` → `TemporalExpansion` → `TrimToLength`.
+3. Validate outputs per step, re-check alignment; restore original settings between attempts to avoid drift.
+
+All alignment events are logged (start, per-step success/failure, checks, success/fail outcome).
+
+### Extending tools and validation
+
+- Add a new tool by implementing `IAgentTool` and registering it in the `ToolRegistry`.
+- Declare expected outputs by extending the mapping in `Evaluator.EvaluateStepAsync` and artifact recording in the orchestrator.
+- The validator enforces canonical ordering and inserts missing required tools with default ids.
 
 ## Project Structure
 
