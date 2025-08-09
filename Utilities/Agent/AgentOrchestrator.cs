@@ -26,9 +26,12 @@ namespace FrameFlow.Utilities.Agent
             var result = new AgentResult();
             // Phase 2: ask Planner for steps; fall back handled inside Planner
             var plan = await _planner.ProposePlanAsync(request);
+            // Validate/repair plan ordering and constraints
+            var validator = new PlanValidator();
+            var validated = validator.ValidateAndRepair(plan);
             var steps = new List<(string id, string tool, string ui, string log)>();
             int idx = 1;
-            foreach (var s in plan.Steps)
+            foreach (var s in validated.Steps)
             {
                 string ui = idx switch
                 {
@@ -64,8 +67,15 @@ namespace FrameFlow.Utilities.Agent
             // Phase 2: planning
             memory?.Append(new RunEvent { Event = "plan_start", StepIndex = null, Message = "Planning steps" });
             plan = await _planner.ProposePlanAsync(request);
+            validated = validator.ValidateAndRepair(plan);
             var planJson = JsonSerializer.Serialize(plan, new JsonSerializerOptions { WriteIndented = true });
+            var planValidatedJson = JsonSerializer.Serialize(validated, new JsonSerializerOptions { WriteIndented = true });
             memory?.SaveText("plan.json", planJson);
+            memory?.SaveText("plan_validated.json", planValidatedJson);
+            if (validated.WasRepaired && validated.Messages.Count > 0)
+            {
+                memory?.Append(new RunEvent { Event = "plan_repaired", StepIndex = null, Message = string.Join("; ", validated.Messages) });
+            }
             memory?.Append(new RunEvent { Event = "plan_ready", StepIndex = null, Message = "Plan prepared" });
 
             var stepReports = new List<object>();
@@ -75,6 +85,7 @@ namespace FrameFlow.Utilities.Agent
             // Pre-known artifacts
             artifacts.Add(new { kind = "story_settings", path = System.IO.Path.Combine(request.RenderDirectory, "story_settings.json") });
             artifacts.Add(new { kind = "plan", path = System.IO.Path.Combine(request.RenderDirectory, "plan.json") });
+            artifacts.Add(new { kind = "plan_validated", path = System.IO.Path.Combine(request.RenderDirectory, "plan_validated.json") });
 
             // Local helpers
             async Task<bool> TryRepairAfterTrimAsync(int stepIdx, List<object> stepReportsLocal)
@@ -242,13 +253,103 @@ namespace FrameFlow.Utilities.Agent
                         LogMessage = $"✓ {log} ({secs}s)"
                     });
 
-                    // Record trimmed artifact on initial success
+                    // After each step, validate step-specific outputs
+                    var stepEval = await _evaluator.EvaluateStepAsync(toolName, request);
+                    if (!stepEval.Pass)
+                    {
+                        var emsg = $"Output validation failed after {toolName}: {stepEval.Reason}";
+                        memory?.Append(new RunEvent { Event = "step_output_fail", StepIndex = stepIdx, Message = emsg });
+
+                        // Special handling for TrimToLength using existing bounded repair flow
+                        if (string.Equals(id, "trim", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var repaired = await TryRepairAfterTrimAsync(stepIdx, stepReports);
+                            if (!repaired)
+                            {
+                                result.Errors.Add(emsg);
+                                // Write report before returning
+                                runStopwatch.Stop();
+                                var reportFail = new
+                                {
+                                    version = 1,
+                                    project = request.ProjectName,
+                                    renderDirectory = request.RenderDirectory,
+                                    outputPath = request.OutputVideoPath,
+                                    success = false,
+                                    totalDurationMs = runStopwatch.ElapsedMilliseconds,
+                                    objectives = new
+                                    {
+                                        targetMinutes = request.TargetMinutes,
+                                        relevance = request.StorySettings.Relevance,
+                                        sentiment = request.StorySettings.Sentiment,
+                                        novelty = request.StorySettings.Novelty,
+                                        energy = request.StorySettings.Energy,
+                                        temporalExpansion = request.StorySettings.TemporalExpansion,
+                                        genai = new
+                                        {
+                                            temperature = request.StorySettings.GenAISettings.Temperature,
+                                            topP = request.StorySettings.GenAISettings.TopP,
+                                            repetitionPenalty = request.StorySettings.GenAISettings.RepetitionPenalty,
+                                            seed = request.StorySettings.GenAISettings.RandomSeed
+                                        }
+                                    },
+                                    steps = stepReports,
+                                    artifacts
+                                };
+                                var jsonFail = JsonSerializer.Serialize(reportFail, new JsonSerializerOptions { WriteIndented = true });
+                                memory?.SaveText("run_report.json", jsonFail);
+                                var artifactsJsonFail = JsonSerializer.Serialize(artifacts, new JsonSerializerOptions { WriteIndented = true });
+                                memory?.SaveText("artifacts.json", artifactsJsonFail);
+                                return result;
+                            }
+                        }
+                        else
+                        {
+                            // For other steps, fail fast
+                            result.Errors.Add(emsg);
+                            runStopwatch.Stop();
+                            var reportFail = new
+                            {
+                                version = 1,
+                                project = request.ProjectName,
+                                renderDirectory = request.RenderDirectory,
+                                outputPath = request.OutputVideoPath,
+                                success = false,
+                                totalDurationMs = runStopwatch.ElapsedMilliseconds,
+                                objectives = new
+                                {
+                                    targetMinutes = request.TargetMinutes,
+                                    relevance = request.StorySettings.Relevance,
+                                    sentiment = request.StorySettings.Sentiment,
+                                    novelty = request.StorySettings.Novelty,
+                                    energy = request.StorySettings.Energy,
+                                    temporalExpansion = request.StorySettings.TemporalExpansion,
+                                    genai = new
+                                    {
+                                        temperature = request.StorySettings.GenAISettings.Temperature,
+                                        topP = request.StorySettings.GenAISettings.TopP,
+                                        repetitionPenalty = request.StorySettings.GenAISettings.RepetitionPenalty,
+                                        seed = request.StorySettings.GenAISettings.RandomSeed
+                                    }
+                                },
+                                steps = stepReports,
+                                artifacts
+                            };
+                            var jsonFail = JsonSerializer.Serialize(reportFail, new JsonSerializerOptions { WriteIndented = true });
+                            memory?.SaveText("run_report.json", jsonFail);
+                            var artifactsJsonFail = JsonSerializer.Serialize(artifacts, new JsonSerializerOptions { WriteIndented = true });
+                            memory?.SaveText("artifacts.json", artifactsJsonFail);
+                            return result;
+                        }
+                    }
+
+                    // Record artifacts when known
                     if (string.Equals(id, "trim", StringComparison.OrdinalIgnoreCase))
                     {
                         artifacts.Add(new { kind = "trim_srt", path = System.IO.Path.Combine(request.RenderDirectory, $"{request.ProjectName}.trim.srt") });
                     }
 
-                    // Minimal evaluation gate: after trim, ensure prerequisites for render
+                    // Minimal evaluation gate remains for trim (redundant, but keeps prior behavior)
                     if (string.Equals(id, "trim", StringComparison.OrdinalIgnoreCase))
                     {
                         var eval = await _evaluator.EvaluateAsync(request);
@@ -257,12 +358,10 @@ namespace FrameFlow.Utilities.Agent
                             var reason = eval.Reason ?? "evaluation failed";
                             var emsg = $"Evaluation did not pass before render: {reason}";
                             memory?.Append(new RunEvent { Event = "evaluation_fail", StepIndex = stepIdx, Message = emsg });
-                            // Attempt bounded self-repair
                             var repaired = await TryRepairAfterTrimAsync(stepIdx, stepReports);
                             if (!repaired)
                             {
                                 result.Errors.Add(emsg);
-                                // Write report before returning
                                 runStopwatch.Stop();
                                 var reportFail = new
                                 {
