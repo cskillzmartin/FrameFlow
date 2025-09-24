@@ -1,6 +1,6 @@
 # FrameFlow
 
-FrameFlow is a professional-grade non-linear video editor powered by AI that helps you create compelling video content from your media library. Using advanced AI models, it analyzes your video content and creates engaging edits based on your prompts.
+FrameFlow is a POC non-linear video editor powered by AI that helps you create compelling video content from your media library. Using advanced AI models, it analyzes your video content and creates engaging edits based on your prompts.
 
 ## Features
 
