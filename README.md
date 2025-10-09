@@ -55,7 +55,7 @@ FrameFlow is a POC non-linear video editor powered by AI that helps you create c
    - Required Models:
      1. **Phi-3 Mini**: Used for content analysis and generation
         - Download from [microsoft/Phi-3-mini-128k-instruct](https://huggingface.co/microsoft/Phi-3-mini-128k-instruct)
-        - Convert to ONNX format for your compute provider (CUDA/DirectML/CPU)
+        - Choose ONNX format for your compute provider (CUDA/DirectML/CPU)
         - Place in the corresponding model directory
      2. **Whisper Base**: Used for audio transcription
         - Download the GGML base model from [Whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp)
